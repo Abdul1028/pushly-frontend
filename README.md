@@ -20,6 +20,30 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Environment Variables
+
+Create a `.env.local` in the project root with:
+
+```
+NEXT_PUBLIC_API_URL=https://api.wareality.tech
+NEXT_PUBLIC_LOG_SERVICE_URL=https://kafka-log-service-4ebd58d6138e.herokuapp.com
+
+# GitHub OAuth (create at https://github.com/settings/developers)
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+
+# NextAuth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=generate_a_strong_random_secret
+```
+
+Then run:
+
+```bash
+pnpm install
+pnpm dev
+```
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
