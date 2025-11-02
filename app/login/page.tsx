@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { PRODUCT_NAME } from "@/lib/config";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -34,7 +35,7 @@ export default function LoginPage() {
     <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center p-8">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Sign in to Pushly</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Sign in to {PRODUCT_NAME}</CardTitle>
           <CardDescription className="text-center">
             Enter your credentials to access your account
           </CardDescription>

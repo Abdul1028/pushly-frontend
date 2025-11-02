@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
 import { Nav } from "@/components/nav";
+import { PRODUCT_NAME } from "@/lib/config";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pushly - Deployment Platform",
-  description: "Modern deployment platform",
+  title: `${PRODUCT_NAME} - Deployment Platform`,
+  description: "Deploy your projects in seconds. Support for Create React App, Vite, Astro and more.",
 };
 
 export default function RootLayout({

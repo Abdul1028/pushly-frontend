@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle } from "lucide-react";
+import { PRODUCT_DOMAIN } from "@/lib/config";
 
 type Project = {
   id: number;
@@ -115,7 +116,7 @@ export default function DashboardPage() {
                   <CardTitle className="line-clamp-1">{p.name}</CardTitle>
                   {p.subdomain && (
                     <CardDescription className="font-mono text-xs">
-                      {p.subdomain}.pushly.app
+                      {p.subdomain}.{PRODUCT_DOMAIN}
                     </CardDescription>
                   )}
                 </CardHeader>

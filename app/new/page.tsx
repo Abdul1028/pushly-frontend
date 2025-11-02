@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PRODUCT_DOMAIN } from "@/lib/config";
 
 export default function NewProjectPage() {
   const { status, token } = useAuth();
@@ -78,7 +79,7 @@ export default function NewProjectPage() {
                 disabled={loading}
               />
               <p className="text-xs text-muted-foreground">
-                {subdomain ? `${subdomain}.pushly.app` : "Choose a subdomain for your project"}
+                {subdomain ? `${subdomain}.${PRODUCT_DOMAIN}` : "Choose a subdomain for your project"}
               </p>
             </div>
             <div className="space-y-2">

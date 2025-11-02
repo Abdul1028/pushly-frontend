@@ -28,6 +28,10 @@ Create a `.env.local` in the project root with:
 NEXT_PUBLIC_API_URL=https://api.wareality.tech
 NEXT_PUBLIC_LOG_SERVICE_URL=https://kafka-log-service-4ebd58d6138e.herokuapp.com
 
+# Product branding (optional - defaults to "Pushly")
+NEXT_PUBLIC_PRODUCT_NAME=Pushly
+NEXT_PUBLIC_PRODUCT_DOMAIN=pushly.app
+
 # GitHub OAuth (create at https://github.com/settings/developers)
 GITHUB_CLIENT_ID=your_github_client_id
 GITHUB_CLIENT_SECRET=your_github_client_secret
