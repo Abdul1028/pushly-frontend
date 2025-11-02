@@ -86,7 +86,7 @@ export default function DashboardPage() {
           </Link>
         </Button>
       </div>
-      
+
       {error && (
         <div className="max-w-6xl mx-auto mb-6">
           <Card className="border-destructive">
@@ -172,55 +172,65 @@ export default function DashboardPage() {
                         <Settings className="h-3.5 w-3.5 text-muted-foreground" />
                       </button>
                     </div>
-
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4">
-                      {/* Project Icon */}
-                      <div className="flex-shrink-0 w-10 h-10 rounded-md bg-muted flex items-center justify-center text-sm font-semibold">
-                        {getInitials(p.name)}
-                      </div>
-
-                      {/* Project Info */}
-                      <div className="flex-1 min-w-0 space-y-3">
-                        {/* Project Name */}
-                        <div>
-                          <h3 className="text-base font-semibold text-foreground truncate">{p.name}</h3>
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-4">
+                        {/* Project Icon */}
+                        <div className="flex-shrink-0 w-10 h-10 rounded-md bg-muted flex items-center justify-center text-sm font-semibold">
+                          {getInitials(p.name)}
                         </div>
 
-                        {/* URL */}
-                        {p.subdomain && (
-                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
-                            <span className="truncate">{p.subdomain}.{PRODUCT_DOMAIN}</span>
+                        {/* Project Info */}
+                        <div className="flex-1 min-w-0 space-y-3">
+                          {/* Project Name */}
+                          <div>
+                            <h3 className="text-base font-semibold text-foreground truncate">{p.name}</h3>
                           </div>
-                        )}
 
-                        {/* GitHub Link */}
-                        {p.gitURL && (
-                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <Github className="h-3.5 w-3.5 flex-shrink-0" />
-                            <span className="truncate">{extractRepoPath(p.gitURL) || p.gitURL}</span>
-                          </div>
-                        )}
-
-                        {/* Last Activity */}
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {p.createdAt && formatDate(p.createdAt) && (
-                            <>
-                              <span>{formatDate(p.createdAt)}</span>
-                              {p.gitBranch && (
-                                <>
-                                  <span>•</span>
-                                  <GitBranch className="h-3 w-3" />
-                                  <span>{p.gitBranch}</span>
-                                </>
-                              )}
-                            </>
+                          {/* URL */}
+                          {p.id && (
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation(); // prevent parent <Link> click
+                                  window.open(`https://${p.id}.${PRODUCT_DOMAIN}`, "_blank", "noopener,noreferrer");
+                                }}
+                                className="truncate hover:underline cursor-pointer bg-transparent border-none p-0 text-inherit text-left"
+                              >
+                                {p.id}.{PRODUCT_DOMAIN}
+                              </button>
+                            </div>
                           )}
+
+
+                          {/* GitHub Link */}
+                          {p.gitURL && (
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <Github className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span className="truncate">{extractRepoPath(p.gitURL) || p.gitURL}</span>
+                            </div>
+                          )}
+
+                          {/* Last Activity */}
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {p.createdAt && formatDate(p.createdAt) && (
+                              <>
+                                <span>{formatDate(p.createdAt)}</span>
+                                {p.gitBranch && (
+                                  <>
+                                    <span>•</span>
+                                    <GitBranch className="h-3 w-3" />
+                                    <span>{p.gitBranch}</span>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
+                    </CardContent>
+
                   </Card>
                 </Link>
               </div>
