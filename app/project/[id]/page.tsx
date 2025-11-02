@@ -128,15 +128,15 @@ export default function ProjectPage() {
 
   if (status !== "authenticated") {
     return (
-      <div className="container py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
         <Skeleton className="h-8 w-48" />
       </div>
     );
   }
 
   return (
-    <div className="container py-8">
-      <div className="flex flex-col gap-6 mb-8">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
+      <div className="flex flex-col gap-6 mb-8 max-w-5xl mx-auto">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Project #{id}</h1>
           <p className="text-muted-foreground mt-1">Manage deployments and configurations</p>
@@ -198,14 +198,16 @@ export default function ProjectPage() {
       </div>
 
       {error && (
-        <Card className="border-destructive mb-6">
-          <CardContent className="pt-6">
-            <p className="text-destructive text-sm">{error}</p>
-          </CardContent>
-        </Card>
+        <div className="max-w-5xl mx-auto mb-6">
+          <Card className="border-destructive">
+            <CardContent className="pt-6">
+              <p className="text-destructive text-sm">{error}</p>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-4 max-w-5xl mx-auto">
         <h2 className="text-2xl font-semibold">Deployments</h2>
         {!deployments ? (
           <div className="space-y-4">

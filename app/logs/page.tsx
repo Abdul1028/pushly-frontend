@@ -145,8 +145,8 @@ export default function LogsPage() {
   }, [status, projectId, deploymentId, error, logs]);
 
   return (
-    <div className="container py-8">
-      <Card>
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
+      <Card className="max-w-5xl mx-auto">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>

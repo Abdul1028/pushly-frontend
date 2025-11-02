@@ -43,7 +43,7 @@ export default function NewProjectPage() {
   if (status !== "authenticated") return null;
 
   return (
-    <div className="container py-8 max-w-2xl">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-2xl">
       <Card>
         <CardHeader>
           <CardTitle className="text-3xl font-bold">New Project</CardTitle>

@@ -61,7 +61,7 @@ export default function DashboardPage() {
 
   if (status !== "authenticated") {
     return (
-      <div className="container py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
         <div className="flex items-center justify-center min-h-[60vh]">
           <Skeleton className="h-8 w-32" />
         </div>
@@ -70,8 +70,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container py-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Manage your projects and deployments</p>
@@ -85,30 +85,34 @@ export default function DashboardPage() {
       </div>
       
       {error && (
-        <Card className="border-destructive mb-6">
-          <CardContent className="pt-6">
-            <p className="text-destructive text-sm">{error}</p>
-          </CardContent>
-        </Card>
+        <div className="max-w-6xl mx-auto mb-6">
+          <Card className="border-destructive">
+            <CardContent className="pt-6">
+              <p className="text-destructive text-sm">{error}</p>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {!projects ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
           {skeletons}
         </div>
       ) : projects.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6 pb-6">
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No projects yet</p>
-              <Button asChild>
-                <Link href="/new">Create your first project</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardContent className="pt-6 pb-6">
+              <div className="text-center py-12">
+                <p className="text-muted-foreground mb-4">No projects yet</p>
+                <Button asChild>
+                  <Link href="/new">Create your first project</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
           {projects.map((p) => {
             const getInitials = (name: string) => {
               return name
