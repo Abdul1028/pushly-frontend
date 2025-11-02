@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useAuth } from "../../hooks/useAuth";
 import { apiFetchAuth } from "../../lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Activity, MoreVertical, Github, GitBranch, ExternalLink } from "lucide-react";
 import { PRODUCT_DOMAIN } from "@/lib/config";
 
 type Project = {
@@ -109,25 +109,110 @@ export default function DashboardPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => (
-            <Link key={p.id} href={`/project/${p.id}`}>
-              <Card className="transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="line-clamp-1">{p.name}</CardTitle>
-                  {p.subdomain && (
-                    <CardDescription className="font-mono text-xs">
-                      {p.subdomain}.{PRODUCT_DOMAIN}
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                {p.description && (
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{p.description}</p>
+          {projects.map((p) => {
+            const getInitials = (name: string) => {
+              return name
+                .split(/[-_\s]/)
+                .map((word) => word[0]?.toUpperCase() || "")
+                .slice(0, 2)
+                .join("");
+            };
+
+            const formatDate = (dateString?: string) => {
+              if (!dateString) return null;
+              const date = new Date(dateString);
+              const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+              return `${months[date.getMonth()]} ${date.getDate()}`;
+            };
+
+            const extractRepoPath = (gitURL?: string) => {
+              if (!gitURL) return null;
+              try {
+                const url = new URL(gitURL);
+                const path = url.pathname.replace(/\.git$/, "").replace(/^\//, "");
+                return path.length > 30 ? `${path.substring(0, 27)}...` : path;
+              } catch {
+                return null;
+              }
+            };
+
+            return (
+              <Link key={p.id} href={`/project/${p.id}`}>
+                <Card className="transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer h-full relative group">
+                  {/* Top Right Icons */}
+                  <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      className="p-1.5 rounded-full bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      className="p-1.5 rounded-full bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4">
+                      {/* Project Icon */}
+                      <div className="flex-shrink-0 w-10 h-10 rounded-md bg-muted flex items-center justify-center text-sm font-semibold">
+                        {getInitials(p.name)}
+                      </div>
+
+                      {/* Project Info */}
+                      <div className="flex-1 min-w-0 space-y-3">
+                        {/* Project Name */}
+                        <div>
+                          <h3 className="text-base font-semibold text-foreground truncate">{p.name}</h3>
+                        </div>
+
+                        {/* URL */}
+                        {p.subdomain && (
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="truncate">{p.subdomain}.{PRODUCT_DOMAIN}</span>
+                          </div>
+                        )}
+
+                        {/* GitHub Link */}
+                        {p.gitURL && (
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <Github className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="truncate">{extractRepoPath(p.gitURL) || p.gitURL}</span>
+                          </div>
+                        )}
+
+                        {/* Last Activity */}
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {p.createdAt && formatDate(p.createdAt) && (
+                            <>
+                              <span>{formatDate(p.createdAt)}</span>
+                              {p.gitBranch && (
+                                <>
+                                  <span>•</span>
+                                  <GitBranch className="h-3 w-3" />
+                                  <span>{p.gitBranch}</span>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
-                )}
-              </Card>
-            </Link>
-          ))}
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
