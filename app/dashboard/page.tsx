@@ -7,8 +7,9 @@ import { apiFetchAuth } from "../../lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Activity, MoreVertical, Github, GitBranch, ExternalLink } from "lucide-react";
+import { PlusCircle, Activity, Settings, Github, GitBranch, ExternalLink } from "lucide-react";
 import { PRODUCT_DOMAIN } from "@/lib/config";
+import { ProjectSettingsDialog } from "@/components/project-settings-dialog";
 
 type Project = {
   id: number;
@@ -25,6 +26,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const fetchProjects = useCallback(async () => {
     if (!token) return;
@@ -141,29 +144,34 @@ export default function DashboardPage() {
             };
 
             return (
-              <Link key={p.id} href={`/project/${p.id}`}>
-                <Card className="transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer h-full relative group">
-                  {/* Top Right Icons */}
-                  <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      className="p-1.5 rounded-full bg-muted/50 hover:bg-muted transition-colors"
-                    >
-                      <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      className="p-1.5 rounded-full bg-muted/50 hover:bg-muted transition-colors"
-                    >
-                      <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                  </div>
+              <div key={p.id} className="relative group">
+                <Link href={`/project/${p.id}`}>
+                  <Card className="transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer h-full relative">
+                    {/* Top Right Icons */}
+                    <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        className="p-1.5 rounded-full bg-muted/50 hover:bg-muted transition-colors"
+                        title="Activity"
+                      >
+                        <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedProject(p);
+                          setSettingsOpen(true);
+                        }}
+                        className="p-1.5 rounded-full bg-muted/50 hover:bg-muted transition-colors"
+                        title="Settings"
+                      >
+                        <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    </div>
 
                   <CardContent className="p-6">
                     <div className="flex items-start gap-4">
@@ -213,11 +221,28 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
-              </Link>
+                  </Card>
+                </Link>
+              </div>
             );
           })}
         </div>
+      )}
+
+      {selectedProject && (
+        <ProjectSettingsDialog
+          project={selectedProject}
+          open={settingsOpen}
+          onOpenChange={(open) => {
+            setSettingsOpen(open);
+            if (!open) {
+              setSelectedProject(null);
+            }
+          }}
+          onProjectUpdated={() => {
+            fetchProjects();
+          }}
+        />
       )}
     </div>
   );
