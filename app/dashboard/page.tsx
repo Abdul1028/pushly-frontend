@@ -188,19 +188,18 @@ export default function DashboardPage() {
 
                           {/* URL */}
                           {p.id && (
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                window.open(`https://${p.id}.${PRODUCT_DOMAIN}`, "_blank", "noopener,noreferrer");
+                              }}
+                              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors text-left w-full"
+                            >
                               <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // prevent parent <Link> click
-                                  window.open(`https://${p.id}.${PRODUCT_DOMAIN}`, "_blank", "noopener,noreferrer");
-                                }}
-                                className="truncate hover:underline cursor-pointer bg-transparent border-none p-0 text-inherit text-left"
-                              >
-                                {p.id}.{PRODUCT_DOMAIN}
-                              </button>
-                            </div>
+                              <span className="truncate hover:underline">{p.id}.{PRODUCT_DOMAIN}</span>
+                            </button>
                           )}
 
 

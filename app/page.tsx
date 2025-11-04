@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRODUCT_NAME } from "@/lib/config";
+import { SystemStatus } from "@/components/system-status";
 import {
   Rocket,
   Zap,
@@ -82,6 +83,11 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-3.5rem)] w-full">
+      {/* System Status Bar */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4 w-full max-w-7xl flex justify-end">
+        <SystemStatus />
+      </div>
+
       {/* Hero Section */}
       <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 w-full max-w-7xl">
         <div className="flex flex-col items-center justify-center text-center space-y-6 mx-auto w-full">
