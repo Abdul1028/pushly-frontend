@@ -193,7 +193,7 @@ export default function DashboardPage() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                window.open(`https://${p.id}.${PRODUCT_DOMAIN}`, "_blank", "noopener,noreferrer");
+                                window.open(`https://${p.subdomain}.${PRODUCT_DOMAIN}`, "_blank", "noopener,noreferrer");
                               }}
                               className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors text-left w-full"
                             >
