@@ -198,7 +198,7 @@ export default function DashboardPage() {
                               className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors text-left w-full"
                             >
                               <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
-                              <span className="truncate hover:underline">{p.id}.{PRODUCT_DOMAIN}</span>
+                              <span className="truncate hover:underline">{p.subdomain}.{PRODUCT_DOMAIN}</span>
                             </button>
                           )}
 
