@@ -249,7 +249,7 @@ export default function ProjectPage() {
                       <Button
                         size="sm"
                         variant="default"
-                        onClick={() => deployTo("PRODUCTION", d.id)}
+                        onClick={() => deployTo(d.environment!, d.id)}
                         disabled={busy}
                       >
                         <Play className="h-3 w-3 mr-1" />
