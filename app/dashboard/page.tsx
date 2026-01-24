@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Activity, Settings, Github, GitBranch, ExternalLink } from "lucide-react";
 import { PRODUCT_DOMAIN } from "@/lib/config";
 import { ProjectSettingsDialog } from "@/components/project-settings-dialog";
+import useSWR from 'swr'
+
 
 type Project = {
   id: number;
@@ -23,32 +25,35 @@ type Project = {
 
 export default function DashboardPage() {
   const { status, token } = useAuth();
+
+  // SWR fetcher
+  const fetchProjectsFetcher = (token: string) =>
+    apiFetchAuth<{ content: Project[] }>("/api/projects?page=0&size=20", token)
+      .then(r => r.content ?? []);
+
+  // SWR hook
+  const { data: projects, error, isLoading, mutate } = useSWR(
+    token ? ["projects", token] : null,
+    ([, token]) => fetchProjectsFetcher(token),
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 5000, // avoid refetch spam
+    }
+  );
+
+
+
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  console.log("SSR running on:", typeof window === "undefined" ? "server" : "client")
+  console.log("TOKEN:", token);
 
-  const fetchProjects = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await apiFetchAuth<{ content: Project[] }>("/api/projects?page=0&size=20", token);
-      setProjects(res.content ?? []);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-    }
-  }, [token]);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.replace("/login");
-      return;
-    }
-    if (status === "authenticated" && token) {
-      fetchProjects();
-    }
-  }, [status, token, router, fetchProjects]);
+
+
+
 
   const skeletons = useMemo(() => Array(6).fill(0).map((_, i) => (
     <Card key={i}>
@@ -62,15 +67,23 @@ export default function DashboardPage() {
     </Card>
   )), []);
 
-  if (status !== "authenticated") {
+  if (status === "loading") return null;
+
+  if (status === "unauthenticated") {
+    router.replace("/login");
+    return null;
+  }
+  if (isLoading && !projects) {
     return (
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Skeleton className="h-8 w-32" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
+          {skeletons}
         </div>
       </div>
     );
   }
+
+
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
@@ -97,11 +110,11 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {!projects ? (
+      {(isLoading && !projects) ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
           {skeletons}
         </div>
-      ) : projects.length === 0 ? (
+      ) : projects?.length === 0 ? (
         <div className="max-w-2xl mx-auto">
           <Card>
             <CardContent className="pt-6 pb-6">
@@ -116,7 +129,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
-          {projects.map((p) => {
+          {projects?.map((p) => {
             const getInitials = (name: string) => {
               return name
                 .split(/[-_\s]/)
@@ -205,11 +218,15 @@ export default function DashboardPage() {
 
                           {/* GitHub Link */}
                           {p.gitURL && (
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <button
+                              onClick={() => window.open(p.gitURL, "_blank")}
+                              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:underline"
+                            >
                               <Github className="h-3.5 w-3.5 flex-shrink-0" />
                               <span className="truncate">{extractRepoPath(p.gitURL) || p.gitURL}</span>
-                            </div>
+                            </button>
                           )}
+
 
                           {/* Last Activity */}
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -248,13 +265,10 @@ export default function DashboardPage() {
               setSelectedProject(null);
             }
           }}
-          onProjectUpdated={() => {
-            fetchProjects();
-          }}
+          onProjectUpdated={() => mutate()}
         />
       )}
     </div>
   );
 }
-
 
