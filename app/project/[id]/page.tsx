@@ -15,7 +15,6 @@ import { ChevronDown } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Play, RotateCcw, Square, FileText, ExternalLink, GitCommitHorizontal, GitBranch, Trash2 } from "lucide-react";
 import { compare } from "swr/_internal";
-
 type Deployment = {
   id: number;
   status: string;
