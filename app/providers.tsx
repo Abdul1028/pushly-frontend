@@ -1,6 +1,7 @@
 "use client";
 import { ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -9,7 +10,9 @@ export default function Providers({ children }: { children: ReactNode }) {
       forcedTheme="dark"
       disableTransitionOnChange
     >
-      {children}
+      <AuthProvider>
+        {children}
+      </AuthProvider>
     </ThemeProvider>
   );
 }
