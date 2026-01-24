@@ -206,41 +206,47 @@ export default function ProjectPage() {
   const stop = useCallback((deploymentId: number, environment?: string) => {
     if (!token) return;
 
+    // Check if this is an active deployment
     const isActiveProduction = activeDeployments?.PRODUCTION === deploymentId;
     const isActiveStaging = activeDeployments?.STAGING === deploymentId;
 
     if (isActiveProduction || isActiveStaging) {
       const envName = isActiveProduction ? "Production" : "Staging";
-      setActiveBlockDialog({ open: true, environment: envName });
+      alert(`❌ Cannot delete active ${envName} deployment.\n\nThis deployment is currently live. Please promote or rollback to another deployment before deleting this one.`);
       return;
     }
 
-    setDeleteDialog({ open: true, deploymentId, environment });
-  }, [token, activeDeployments]);
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `🗑️ Delete Deployment?\n\nAre you sure you want to delete this deployment?\n\nEnvironment: ${environment || 'Unknown'}\n\nThis action cannot be undone.`
+    );
 
-  const confirmDelete = useCallback(async () => {
-    if (!token || !deleteDialog.deploymentId) return;
+    if (!confirmed) {
+      return;
+    }
 
     setBusy(true);
     setError(null);
-    setDeleteDialog({ open: false });
 
     try {
-      await apiFetchAuth(`/api/projects/${id}/deployments/${deleteDialog.deploymentId}`, token, { method: "DELETE" });
-      setSuccessDialog({ open: true, message: "Deployment deleted successfully!" });
+      await apiFetchAuth(`/api/projects/${id}/deployments/${deploymentId}`, token, { method: "DELETE" });
+
+      // Success confirmation
+      alert("✅ Deployment deleted successfully!");
+
       await fetchDeployments();
       await fetchActiveDeployments();
     } catch (e: any) {
       console.log("error is: ", e)
       if (e.status === 400 && e.data?.message === "Cannot delete active deployment") {
-        setActiveBlockDialog({ open: true, environment: deleteDialog.environment || "" });
+        alert("❌ Cannot delete active deployment.\n\nThis deployment is currently live. Please promote or rollback to another deployment before deleting.");
       } else {
         setError("Failed to delete deployment: " + (e.message || "Unknown error"));
       }
     } finally {
       setBusy(false);
     }
-  }, [token, id, fetchDeployments, fetchActiveDeployments, deleteDialog]);
+  }, [token, id, fetchDeployments, fetchActiveDeployments, activeDeployments]);
 
   const getStatusColor = useMemo(() => (status: string) => {
     const lower = status.toLowerCase();
@@ -880,12 +886,12 @@ export default function ProjectPage() {
             <AlertDialogDescription className="text-neutral-400 text-base pt-2">
               Are you sure you want to delete this deployment?
               {deleteDialog.environment && (
-                <span className="mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/10 block">
-                  <span className="text-xs text-neutral-500 block">Environment</span>
-                  <span className="text-sm text-white font-medium mt-1 block">{deleteDialog.environment}</span>
-                </span>
+                <div className="mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/10">
+                  <div className="text-xs text-neutral-500">Environment</div>
+                  <div className="text-sm text-white font-medium mt-1">{deleteDialog.environment}</div>
+                </div>
               )}
-              <span className="mt-4 text-sm text-red-400 block">This action cannot be undone.</span>
+              <p className="mt-4 text-sm text-red-400">This action cannot be undone.</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -918,9 +924,9 @@ export default function ProjectPage() {
             <AlertDialogTitle className="text-white text-xl">Cannot Delete Active Deployment</AlertDialogTitle>
             <AlertDialogDescription className="text-neutral-400 text-base pt-2">
               This deployment is currently live in <span className="text-yellow-400 font-medium">{activeBlockDialog.environment}</span>.
-              <span className="mt-4 block">
+              <p className="mt-4">
                 Please promote or rollback to another deployment before deleting this one.
-              </span>
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
