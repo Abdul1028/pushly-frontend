@@ -14,12 +14,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ChevronDown, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Play, RotateCcw, Square, FileText, ExternalLink, GitCommitHorizontal, GitBranch, Trash2 } from "lucide-react";
+import { Play, RotateCcw, Square, FileText, ExternalLink, GitCommitHorizontal, GitBranch, Trash2, ArrowUp } from "lucide-react";
 import { compare } from "swr/_internal";
 type Deployment = {
   id: number;
   status: string;
   environment?: string;
+  lastAction?: 'DEPLOYED' | 'PROMOTED' | 'ROLLBACKED' | null;
   gitCommitHash?: string;
   gitBranch?: string;
   createdAt?: string;
@@ -73,6 +74,8 @@ export default function ProjectPage() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; deploymentId?: number; environment?: string }>({ open: false });
   const [activeBlockDialog, setActiveBlockDialog] = useState<{ open: boolean; environment?: string }>({ open: false });
   const [successDialog, setSuccessDialog] = useState<{ open: boolean; message?: string }>({ open: false });
+  const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; deployment?: Deployment }>({ open: false });
+  const [rollbackDialog, setRollbackDialog] = useState<{ open: boolean; deployment?: Deployment }>({ open: false });
 
 
 
@@ -241,6 +244,44 @@ export default function ProjectPage() {
       setBusy(false);
     }
   }, [token, id, fetchDeployments, fetchActiveDeployments, deleteDialog]);
+
+  const confirmPromote = useCallback(async () => {
+    if (!token || !promoteDialog.deployment) return;
+
+    setBusy(true);
+    setError(null);
+    setPromoteDialog({ open: false });
+
+    try {
+      await apiFetchAuth(`/api/projects/${id}/deployments/${promoteDialog.deployment.id}/promote`, token, { method: "POST" });
+      setSuccessDialog({ open: true, message: "Successfully promoted to Production!" });
+      await fetchDeployments();
+      await fetchActiveDeployments();
+    } catch (e: any) {
+      setError("Failed to promote deployment: " + (e.message || "Unknown error"));
+    } finally {
+      setBusy(false);
+    }
+  }, [token, id, fetchDeployments, fetchActiveDeployments, promoteDialog]);
+
+  const confirmRollback = useCallback(async () => {
+    if (!token || !rollbackDialog.deployment) return;
+
+    setBusy(true);
+    setError(null);
+    setRollbackDialog({ open: false });
+
+    try {
+      await apiFetchAuth(`/api/projects/${id}/deployments/${rollbackDialog.deployment.id}/rollback`, token, { method: "POST" });
+      setSuccessDialog({ open: true, message: "Successfully rolled back Production!" });
+      await fetchDeployments();
+      await fetchActiveDeployments();
+    } catch (e: any) {
+      setError("Failed to rollback deployment: " + (e.message || "Unknown error"));
+    } finally {
+      setBusy(false);
+    }
+  }, [token, id, fetchDeployments, fetchActiveDeployments, rollbackDialog]);
 
   const getStatusColor = useMemo(() => (status: string) => {
     const lower = status.toLowerCase();
@@ -512,6 +553,18 @@ export default function ProjectPage() {
                                           Active
                                         </span>
                                       )}
+                                      {d.lastAction === 'PROMOTED' && (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium rounded-full border bg-green-500/10 text-green-400 border-green-500/20 flex-shrink-0">
+                                          <ArrowUp className="h-2.5 w-2.5" />
+                                          Promoted
+                                        </span>
+                                      )}
+                                      {d.lastAction === 'ROLLBACKED' && (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium rounded-full border bg-yellow-500/10 text-yellow-400 border-yellow-500/20 flex-shrink-0">
+                                          <RotateCcw className="h-2.5 w-2.5" />
+                                          Rollbacked
+                                        </span>
+                                      )}
                                     </div>
 
                                     {/* Row 2: Environment + Commit + Time */}
@@ -543,6 +596,7 @@ export default function ProjectPage() {
 
                                     {/* Row 3: Actions */}
                                     <div className="flex items-center gap-2 pt-1">
+                                      {/* Deploy button (for non-RUNNING deployments) */}
                                       {d.status !== "RUNNING" && (
                                         <Button
                                           size="sm"
@@ -554,13 +608,27 @@ export default function ProjectPage() {
                                           Deploy
                                         </Button>
                                       )}
-                                      {d.status !== "DEPLOYING" && (
+                                      {/* Promote to Production button (only for STAGING RUNNING deployments) */}
+                                      {d.environment === "STAGING" && d.status === "RUNNING" && (
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          onClick={() => rollback(d.id, d.environment!)}
+                                          onClick={() => setPromoteDialog({ open: true, deployment: d })}
                                           disabled={busy}
-                                          className="h-8 border-white/10 bg-transparent text-white hover:bg-white/5 text-xs px-3"
+                                          className="h-8 bg-green-600 border-green-600 text-white hover:bg-green-700 hover:border-green-700 text-xs px-3 font-medium"
+                                        >
+                                          <ArrowUp className="h-3 w-3 mr-1.5" />
+                                          Promote to Production
+                                        </Button>
+                                      )}
+                                      {/* Rollback button (only for NON-ACTIVE PRODUCTION RUNNING deployments) */}
+                                      {d.environment === "PRODUCTION" && !isActiveProd && d.status === "RUNNING" && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => setRollbackDialog({ open: true, deployment: d })}
+                                          disabled={busy}
+                                          className="h-8 border-yellow-600/50 bg-yellow-600/10 text-yellow-400 hover:bg-yellow-600/20 hover:border-yellow-600 text-xs px-3"
                                         >
                                           <RotateCcw className="h-3 w-3 mr-1.5" />
                                           Rollback
@@ -733,6 +801,7 @@ export default function ProjectPage() {
 
                                     {/* Row 3: Actions */}
                                     <div className="flex items-center gap-2 pt-1">
+                                      {/* Deploy button (for non-RUNNING deployments) */}
                                       {d.status !== "RUNNING" && (
                                         <Button
                                           size="sm"
@@ -744,16 +813,17 @@ export default function ProjectPage() {
                                           Deploy
                                         </Button>
                                       )}
-                                      {d.status !== "DEPLOYING" && (
+                                      {/* Promote to Production button (only for STAGING RUNNING deployments) */}
+                                      {d.status === "RUNNING" && (
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          onClick={() => rollback(d.id, d.environment!)}
+                                          onClick={() => setPromoteDialog({ open: true, deployment: d })}
                                           disabled={busy}
-                                          className="h-8 border-white/10 bg-transparent text-white hover:bg-white/5 text-xs px-3"
+                                          className="h-8 bg-green-600 border-green-600 text-white hover:bg-green-700 hover:border-green-700 text-xs px-3 font-medium"
                                         >
-                                          <RotateCcw className="h-3 w-3 mr-1.5" />
-                                          Rollback
+                                          <ArrowUp className="h-3 w-3 mr-1.5" />
+                                          Promote to Production
                                         </Button>
                                       )}
                                       <Button
@@ -954,6 +1024,88 @@ export default function ProjectPage() {
               className="bg-green-600 text-white hover:bg-green-700"
             >
               Done
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Promote to Production Dialog */}
+      <AlertDialog open={promoteDialog.open} onOpenChange={(open) => setPromoteDialog({ ...promoteDialog, open })}>
+        <AlertDialogContent className="bg-neutral-950 border-green-900/20">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
+                <ArrowUp className="h-6 w-6 text-green-400" />
+              </div>
+            </div>
+            <AlertDialogTitle className="text-white text-xl">Promote to Production?</AlertDialogTitle>
+            <AlertDialogDescription className="text-neutral-400 text-base pt-2">
+              Are you sure you want to promote this staging deployment to production?
+              {promoteDialog.deployment && (
+                <span className="mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/10 block">
+                  <span className="text-xs text-neutral-500 block">Deployment</span>
+                  <span className="text-sm text-white font-medium mt-1 block">
+                    {promoteDialog.deployment.gitBranch || 'Unknown'} • {promoteDialog.deployment.gitCommitHash?.substring(0, 7) || 'N/A'}
+                  </span>
+                </span>
+              )}
+              <span className="mt-4 text-sm text-green-400 block">This will make it the live deployment.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setPromoteDialog({ open: false })}
+              className="bg-transparent border-white/10 text-white hover:bg-white/5"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmPromote}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              <ArrowUp className="h-4 w-4 mr-2" />
+              Promote to Production
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Rollback Production Dialog */}
+      <AlertDialog open={rollbackDialog.open} onOpenChange={(open) => setRollbackDialog({ ...rollbackDialog, open })}>
+        <AlertDialogContent className="bg-neutral-950 border-yellow-900/20">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                <RotateCcw className="h-6 w-6 text-yellow-400" />
+              </div>
+            </div>
+            <AlertDialogTitle className="text-white text-xl">Rollback Production?</AlertDialogTitle>
+            <AlertDialogDescription className="text-neutral-400 text-base pt-2">
+              Are you sure you want to rollback production to this deployment?
+              {rollbackDialog.deployment && (
+                <span className="mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/10 block">
+                  <span className="text-xs text-neutral-500 block">Target Deployment</span>
+                  <span className="text-sm text-white font-medium mt-1 block">
+                    {rollbackDialog.deployment.gitBranch || 'Unknown'} • {rollbackDialog.deployment.gitCommitHash?.substring(0, 7) || 'N/A'}
+                  </span>
+                </span>
+              )}
+              <span className="mt-4 text-sm text-yellow-400 block">Current active deployment will be replaced.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setRollbackDialog({ open: false })}
+              className="bg-transparent border-white/10 text-white hover:bg-white/5"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRollback}
+              className="bg-yellow-600 text-white hover:bg-yellow-700"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Rollback Production
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
