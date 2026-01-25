@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,8 +22,12 @@ import {
   Check,
   UserCircle,
   Settings as SettingsIcon,
+  Github,
+  Link as LinkIcon,
+  Unlink,
 } from "lucide-react";
 import { PRODUCT_NAME } from "@/lib/config";
+import { GitHubConnectionCard } from "@/components/github-connection-card";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -331,6 +336,19 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* GitHub Integration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>GitHub Integration</CardTitle>
+              <CardDescription>
+                Connect your GitHub account to access private repositories and enable automatic deployments.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <GitHubConnectionCard token={token} />
             </CardContent>
           </Card>
 

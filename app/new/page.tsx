@@ -235,7 +235,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PRODUCT_DOMAIN } from "@/lib/config";
-import { Check, X, Loader2, AlertCircle, ExternalLink, Info } from "lucide-react";
+import { Check, X, Loader2, AlertCircle, ExternalLink, Info, Github } from "lucide-react";
+import { GitHubRepoBrowser } from "@/components/github-repo-browser";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /* ---------------- constants ---------------- */
 
@@ -488,49 +490,93 @@ export default function NewProjectPage() {
               )}
             </div>
 
-            {/* Git Configuration */}
+            {/* Git Configuration with Tabs */}
             <div className="space-y-4 pt-2">
               <div className="flex items-center gap-2 text-sm">
                 <div className="h-px flex-1 bg-border" />
-                <span className="text-muted-foreground">Git Configuration</span>
+                <span className="text-muted-foreground">Repository Source</span>
                 <div className="h-px flex-1 bg-border" />
               </div>
 
-              {/* Git URL */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium" htmlFor="gitURL">
-                  Repository URL
-                </Label>
-                <Input
-                  id="gitURL"
-                  value={gitURL}
-                  onChange={(e) => setGitURL(e.target.value)}
-                  placeholder="https://github.com/username/repo.git"
-                  disabled={loading}
-                  className="h-10 font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Connect a Git repository for automatic deployments
-                </p>
-              </div>
+              <Tabs defaultValue="github" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="github" className="flex items-center gap-2">
+                    <Github className="h-4 w-4" />
+                    <span>Import from GitHub</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="manual" className="flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    <span>Manual Git URL</span>
+                  </TabsTrigger>
+                </TabsList>
 
-              {/* Git Branch */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium" htmlFor="gitBranch">
-                  Branch
-                </Label>
-                <Input
-                  id="gitBranch"
-                  value={gitBranch}
-                  onChange={(e) => setGitBranch(e.target.value)}
-                  placeholder="main"
-                  disabled={loading}
-                  className="h-10"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Branch to deploy from (defaults to "main")
-                </p>
-              </div>
+                <TabsContent value="github" className="space-y-4 mt-4">
+                  {/* GitHub Repo Browser */}
+                  <GitHubRepoBrowser
+                    token={token}
+                    onSelectRepo={(url, branch) => {
+                      setGitURL(url);
+                      setGitBranch(branch);
+                      // Auto-fill project name from repo URL
+                      const repoName = url.split('/').pop()?.replace('.git', '') || '';
+                      if (repoName && !name) {
+                        setName(repoName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+                      }
+                      // Auto-suggest subdomain
+                      if (repoName && !subdomain) {
+                        setSubdomain(repoName.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                      }
+                    }}
+                  />
+
+                  {/* Selected Repository Display */}
+                  {gitURL && (
+                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <p className="text-xs text-muted-foreground mb-1">Selected Repository:</p>
+                      <p className="text-sm font-mono truncate">{gitURL}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Branch: {gitBranch}</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="manual" className="space-y-4 mt-4">
+                  {/* Git URL */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium" htmlFor="gitURL">
+                      Repository URL
+                    </Label>
+                    <Input
+                      id="gitURL"
+                      value={gitURL}
+                      onChange={(e) => setGitURL(e.target.value)}
+                      placeholder="https://github.com/username/repo.git"
+                      disabled={loading}
+                      className="h-10 font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the Git URL from GitHub, GitLab, Bitbucket, or any Git provider
+                    </p>
+                  </div>
+
+                  {/* Git Branch */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium" htmlFor="gitBranch">
+                      Branch
+                    </Label>
+                    <Input
+                      id="gitBranch"
+                      value={gitBranch}
+                      onChange={(e) => setGitBranch(e.target.value)}
+                      placeholder="main"
+                      disabled={loading}
+                      className="h-10"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Branch to deploy from (defaults to "main")
+                    </p>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
 
             {/* Description */}
