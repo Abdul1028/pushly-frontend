@@ -17,8 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { PRODUCT_DOMAIN } from "@/lib/config";
+import { useToast } from "@/components/ui/use-toast";
 
 type Project = {
   id: number;
@@ -45,6 +46,7 @@ export function ProjectSettingsDialog({
 }: ProjectSettingsDialogProps) {
   const router = useRouter();
   const { token } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -58,6 +60,11 @@ export function ProjectSettingsDialog({
   const [gitBranch, setGitBranch] = useState(project.gitBranch || "main");
   const [subdomain, setSubdomain] = useState(project.subdomain || "");
 
+  // Subdomain validation states
+  const [checkingSubdomain, setCheckingSubdomain] = useState(false);
+  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  const [subdomainError, setSubdomainError] = useState<string | null>(null);
+
   // Reset form when project or dialog opens
   useEffect(() => {
     if (open) {
@@ -67,12 +74,59 @@ export function ProjectSettingsDialog({
       setGitBranch(project.gitBranch || "main");
       setSubdomain(project.subdomain || "");
       setError(null);
+      setSubdomainAvailable(null);
+      setSubdomainError(null);
     }
   }, [open, project]);
+
+  // Debounced subdomain validation
+  useEffect(() => {
+    if (!token || !subdomain || subdomain === project.subdomain) {
+      setSubdomainAvailable(null);
+      setSubdomainError(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setCheckingSubdomain(true);
+      setSubdomainError(null);
+
+      try {
+        const response = await apiFetchAuth(
+          `/api/projects/domain-available?domain=${encodeURIComponent(subdomain)}`,
+          token
+        ) as { available: boolean; message: string };
+
+        setSubdomainAvailable(response.available);
+        if (!response.available) {
+          setSubdomainError(response.message || "Subdomain is not available");
+        }
+      } catch (err: any) {
+        setSubdomainError(err?.message || "Failed to check subdomain availability");
+        setSubdomainAvailable(false);
+      } finally {
+        setCheckingSubdomain(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [subdomain, token, project.subdomain]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
+
+    // Validate subdomain availability if changed
+    if (subdomain && subdomain !== project.subdomain) {
+      if (subdomainAvailable === false || subdomainError) {
+        setError(subdomainError || "Please choose an available subdomain");
+        return;
+      }
+      if (checkingSubdomain) {
+        setError("Please wait while we check subdomain availability");
+        return;
+      }
+    }
 
     setLoading(true);
     setError(null);
@@ -88,10 +142,23 @@ export function ProjectSettingsDialog({
           subdomain,
         }),
       });
+
+      toast({
+        title: "Success",
+        description: "Project updated successfully",
+        variant: "default",
+      });
+
       onProjectUpdated?.();
       onOpenChange(false);
     } catch (err: any) {
-      setError(err?.message || "Failed to update project");
+      const errorMessage = err?.message || "Failed to update project";
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -108,12 +175,25 @@ export function ProjectSettingsDialog({
       await apiFetchAuth(`/api/projects/${project.id}`, token, {
         method: "DELETE",
       });
+
+      toast({
+        title: "Success",
+        description: "Project deleted successfully",
+        variant: "default",
+      });
+
       onOpenChange(false);
       setDeleteOpen(false);
       router.push("/dashboard");
       onProjectUpdated?.();
     } catch (err: any) {
-      setDeleteError(err?.message || "Failed to delete project");
+      const errorMessage = err?.message || "Failed to delete project";
+      setDeleteError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setDeleting(false);
     }
@@ -151,16 +231,51 @@ export function ProjectSettingsDialog({
 
             <div className="space-y-2">
               <Label htmlFor="subdomain">Subdomain</Label>
-              <Input
-                id="subdomain"
-                value={subdomain}
-                onChange={(e) => setSubdomain(e.target.value)}
-                placeholder="my-project"
-                disabled={loading}
-              />
-              <p className="text-xs text-muted-foreground">
-                {subdomain ? `${subdomain}.${PRODUCT_DOMAIN}` : "Choose a subdomain for your project"}
-              </p>
+              <div className="relative">
+                <Input
+                  id="subdomain"
+                  value={subdomain}
+                  onChange={(e) => setSubdomain(e.target.value)}
+                  placeholder="my-project"
+                  disabled={loading}
+                  className={subdomainError && subdomain !== project.subdomain ? "border-destructive" : ""}
+                />
+                {checkingSubdomain && subdomain && subdomain !== project.subdomain && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+                {!checkingSubdomain && subdomain && subdomain !== project.subdomain && subdomainAvailable === true && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  </div>
+                )}
+                {!checkingSubdomain && subdomain && subdomain !== project.subdomain && subdomainAvailable === false && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <XCircle className="h-4 w-4 text-destructive" />
+                  </div>
+                )}
+              </div>
+              {subdomain && subdomain !== project.subdomain && subdomainError && (
+                <p className="text-xs text-destructive">
+                  {subdomainError}
+                </p>
+              )}
+              {subdomain && subdomain === project.subdomain && (
+                <p className="text-xs text-muted-foreground">
+                  Current: {subdomain}.{PRODUCT_DOMAIN}
+                </p>
+              )}
+              {subdomain && subdomain !== project.subdomain && subdomainAvailable === true && (
+                <p className="text-xs text-green-600">
+                  ✓ {subdomain}.{PRODUCT_DOMAIN} is available
+                </p>
+              )}
+              {!subdomain && (
+                <p className="text-xs text-muted-foreground">
+                  Choose a subdomain for your project
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
