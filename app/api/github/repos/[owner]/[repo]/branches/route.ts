@@ -4,10 +4,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.wareal
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { owner: string; repo: string } }
+    { params }: { params: Promise<{ owner: string; repo: string }> }
 ) {
     try {
-        const { owner, repo } = params;
+        const { owner, repo } = await params;
 
         // Get JWT from Authorization header
         const authHeader = request.headers.get('Authorization');

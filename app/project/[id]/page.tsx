@@ -596,8 +596,8 @@ export default function ProjectPage() {
 
                                     {/* Row 3: Actions */}
                                     <div className="flex items-center gap-2 pt-1">
-                                      {/* Deploy button (for non-RUNNING deployments) */}
-                                      {d.status !== "RUNNING" && (
+                                      {/* Deploy button (for non-RUNNING and non-SUCCESS deployments) */}
+                                      {d.status !== "RUNNING" && d.status !== "SUCCESS" && (
                                         <Button
                                           size="sm"
                                           onClick={() => deployTo(d.environment!, d.id)}
@@ -621,8 +621,8 @@ export default function ProjectPage() {
                                           Promote to Production
                                         </Button>
                                       )}
-                                      {/* Rollback button (only for NON-ACTIVE PRODUCTION RUNNING deployments) */}
-                                      {d.environment === "PRODUCTION" && !isActiveProd && d.status === "RUNNING" && (
+                                      {/* Rollback button (only for NON-ACTIVE PRODUCTION RUNNING/SUCCESS deployments) */}
+                                      {d.environment === "PRODUCTION" && !isActiveProd && (d.status === "RUNNING" || d.status === "SUCCESS") && (
                                         <Button
                                           size="sm"
                                           variant="outline"
@@ -801,8 +801,8 @@ export default function ProjectPage() {
 
                                     {/* Row 3: Actions */}
                                     <div className="flex items-center gap-2 pt-1">
-                                      {/* Deploy button (for non-RUNNING deployments) */}
-                                      {d.status !== "RUNNING" && (
+                                      {/* Deploy button (for non-RUNNING and non-SUCCESS deployments) */}
+                                      {d.status !== "RUNNING" && d.status !== "SUCCESS" && (
                                         <Button
                                           size="sm"
                                           onClick={() => deployTo(d.environment!, d.id)}
@@ -813,8 +813,8 @@ export default function ProjectPage() {
                                           Deploy
                                         </Button>
                                       )}
-                                      {/* Promote to Production button (only for STAGING RUNNING deployments) */}
-                                      {d.status === "RUNNING" && (
+                                      {/* Promote to Production button (only for STAGING RUNNING/SUCCESS deployments) */}
+                                      {(d.status === "RUNNING" || d.status === "SUCCESS") && (
                                         <Button
                                           size="sm"
                                           variant="outline"

@@ -1,221 +1,3 @@
-// "use client";
-
-// import { FormEvent, useEffect, useState } from "react";
-// import { useRouter } from "next/navigation";
-// import { useAuth } from "../../hooks/useAuth";
-// import { apiFetchAuth } from "../../lib/api";
-// import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input";
-// import { Label } from "@/components/ui/label";
-// import { Textarea } from "@/components/ui/textarea";
-// import {
-//   Card,
-//   CardContent,
-//   CardDescription,
-//   CardHeader,
-//   CardTitle,
-// } from "@/components/ui/card";
-// import { PRODUCT_DOMAIN } from "@/lib/config";
-
-// export default function NewProjectPage() {
-//   const { status, token } = useAuth();
-//   const router = useRouter();
-
-//   // form fields
-//   const [name, setName] = useState("");
-//   const [description, setDescription] = useState("");
-//   const [gitURL, setGitURL] = useState("");
-//   const [gitBranch, setGitBranch] = useState("main");
-//   const [subdomain, setSubdomain] = useState("");
-
-//   // ui states
-//   const [error, setError] = useState<string | null>(null);
-//   const [loading, setLoading] = useState(false);
-
-//   // domain availability states
-//   const [checkingDomain, setCheckingDomain] = useState(false);
-//   const [domainAvailable, setDomainAvailable] = useState<boolean | null>(null);
-
-//   // 🔥 Debounced domain availability check
-//   useEffect(() => {
-//     if (!subdomain || !token) {
-//       setDomainAvailable(null);
-//       return;
-//     }
-
-//     const timer = setTimeout(async () => {
-//       try {
-//         setCheckingDomain(true);
-//         const res = await apiFetchAuth<{ available: boolean }>(
-//           `/api/projects/domain-available?domain=${subdomain}`,
-//           token
-//         );
-//         setDomainAvailable(res.available);
-//       } catch {
-//         setDomainAvailable(false);
-//       } finally {
-//         setCheckingDomain(false);
-//       }
-//     }, 500); // debounce delay
-
-//     return () => clearTimeout(timer);
-//   }, [subdomain, token]);
-
-//   // submit handler
-//   async function onSubmit(e: FormEvent) {
-//     e.preventDefault();
-//     if (!token) return;
-
-//     setLoading(true);
-//     setError(null);
-
-//     try {
-//       const body = { name, description, gitURL, gitBranch, subdomain };
-//       const res = await apiFetchAuth<{ id: string }>("/api/projects", token, {
-//         method: "POST",
-//         body: JSON.stringify(body),
-//       });
-
-//       router.replace(`/project/${res.id}`);
-//     } catch (err: any) {
-//       setError(err?.message || "Failed to create project");
-//     } finally {
-//       setLoading(false);
-//     }
-//   }
-
-//   if (status !== "authenticated") return null;
-
-//   return (
-//     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-2xl">
-//       <Card>
-//         <CardHeader>
-//           <CardTitle className="text-3xl font-bold">New Project</CardTitle>
-//           <CardDescription>
-//             Create a new project to start deploying
-//           </CardDescription>
-//         </CardHeader>
-
-//         <CardContent>
-//           {error && (
-//             <div className="mb-6 p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
-//               {error}
-//             </div>
-//           )}
-
-//           <form onSubmit={onSubmit} className="space-y-6">
-//             {/* Project Name */}
-//             <div className="space-y-2">
-//               <Label htmlFor="name">Project name *</Label>
-//               <Input
-//                 id="name"
-//                 value={name}
-//                 onChange={(e) => setName(e.target.value)}
-//                 placeholder="my-awesome-project"
-//                 required
-//                 disabled={loading}
-//               />
-//             </div>
-
-//             {/* Subdomain */}
-//             <div className="space-y-2">
-//               <Label htmlFor="subdomain">Subdomain</Label>
-//               <Input
-//                 id="subdomain"
-//                 value={subdomain}
-//                 onChange={(e) => setSubdomain(e.target.value)}
-//                 placeholder="my-project"
-//                 disabled={loading}
-//                 className={
-//                   domainAvailable === null
-//                     ? ""
-//                     : domainAvailable
-//                     ? "border-green-500 focus-visible:ring-green-500"
-//                     : "border-red-500 focus-visible:ring-red-500"
-//                 }
-//               />
-
-//               <p className="text-xs mt-1">
-//                 {checkingDomain && (
-//                   <span className="text-muted-foreground">
-//                     Checking availability…
-//                   </span>
-//                 )}
-
-//                 {!checkingDomain && domainAvailable === true && (
-//                   <span className="text-green-600">
-//                     ✓ {subdomain}.{PRODUCT_DOMAIN} is available
-//                   </span>
-//                 )}
-
-//                 {!checkingDomain && domainAvailable === false && (
-//                   <span className="text-red-600">
-//                     ✕ {subdomain}.{PRODUCT_DOMAIN} is already taken
-//                   </span>
-//                 )}
-
-//                 {!subdomain && (
-//                   <span className="text-muted-foreground">
-//                     Choose a subdomain for your project
-//                   </span>
-//                 )}
-//               </p>
-//             </div>
-
-//             {/* Git URL */}
-//             <div className="space-y-2">
-//               <Label htmlFor="gitURL">Git URL</Label>
-//               <Input
-//                 id="gitURL"
-//                 value={gitURL}
-//                 onChange={(e) => setGitURL(e.target.value)}
-//                 placeholder="https://github.com/user/repo.git"
-//                 disabled={loading}
-//               />
-//             </div>
-
-//             {/* Git Branch */}
-//             <div className="space-y-2">
-//               <Label htmlFor="gitBranch">Git Branch</Label>
-//               <Input
-//                 id="gitBranch"
-//                 value={gitBranch}
-//                 onChange={(e) => setGitBranch(e.target.value)}
-//                 placeholder="main"
-//                 disabled={loading}
-//               />
-//             </div>
-
-//             {/* Description */}
-//             <div className="space-y-2">
-//               <Label htmlFor="description">Description</Label>
-//               <Textarea
-//                 id="description"
-//                 value={description}
-//                 onChange={(e) => setDescription(e.target.value)}
-//                 placeholder="A brief description of your project"
-//                 disabled={loading}
-//                 rows={4}
-//               />
-//             </div>
-
-//             {/* Submit */}
-//             <Button
-//               type="submit"
-//               disabled={loading || domainAvailable === false}
-//               className="w-full"
-//             >
-//               {loading ? "Creating…" : "Create Project"}
-//             </Button>
-//           </form>
-//         </CardContent>
-//       </Card>
-//     </div>
-//   );
-// }
-
-
-
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
@@ -235,9 +17,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PRODUCT_DOMAIN } from "@/lib/config";
-import { Check, X, Loader2, AlertCircle, ExternalLink, Info, Github } from "lucide-react";
+import { Check, X, Loader2, AlertCircle, ExternalLink, Info, Github, Rocket } from "lucide-react";
 import { GitHubRepoBrowser } from "@/components/github-repo-browser";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 /* ---------------- constants ---------------- */
 
@@ -265,6 +48,11 @@ export default function NewProjectPage() {
   const [gitURL, setGitURL] = useState("");
   const [gitBranch, setGitBranch] = useState("main");
   const [subdomain, setSubdomain] = useState("");
+  const [selectedRepo, setSelectedRepo] = useState<string>("");
+
+  // Auto-deploy options
+  const [autoDeployEnabled, setAutoDeployEnabled] = useState(true);
+  const [autoDeployEnv, setAutoDeployEnv] = useState<"STAGING" | "PRODUCTION">("STAGING");
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -282,7 +70,6 @@ export default function NewProjectPage() {
       return;
     }
 
-    // normalize already handled in onChange
     if (subdomain.length < 4) {
       setDomainStatus("short");
       return;
@@ -313,7 +100,7 @@ export default function NewProjectPage() {
       } catch {
         setDomainStatus("taken");
       }
-    }, 500); // ⏱ debounce
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [subdomain, token]);
@@ -333,18 +120,31 @@ export default function NewProjectPage() {
     setError(null);
 
     try {
-      const body = { name, description, gitURL, gitBranch, subdomain };
+      const body = {
+        name,
+        description,
+        gitURL,
+        gitBranch,
+        subdomain,
+        autoDeployEnabled,
+        autoDeployEnv: autoDeployEnabled ? autoDeployEnv : null,
+      };
 
-      const res = await apiFetchAuth<{ id: string }>(
-        "/api/projects",
-        token,
-        {
-          method: "POST",
-          body: JSON.stringify(body),
-        }
-      );
+      const res = await apiFetchAuth<{
+        id: string;
+        deploymentId?: string;
+      }>("/api/projects", token, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
 
-      router.replace(`/project/${res.id}`);
+      // Redirect based on whether auto-deploy is enabled
+      if (autoDeployEnabled && res.deploymentId) {
+        // Redirect to logs page to show live build progress
+        router.replace(`/logs?projectId=${res.id}&deploymentId=${res.deploymentId}`);
+      } else {
+        router.replace(`/project/${res.id}`);
+      }
     } catch (err: any) {
       setError(err?.message || "Failed to create project");
     } finally {
@@ -471,7 +271,6 @@ export default function NewProjectPage() {
                 className="h-10"
               />
 
-              {/* Domain preview */}
               {subdomain && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border border-border rounded-md">
                   <span className="text-sm font-mono">
@@ -511,25 +310,29 @@ export default function NewProjectPage() {
                 </TabsList>
 
                 <TabsContent value="github" className="space-y-4 mt-4">
-                  {/* GitHub Repo Browser */}
                   <GitHubRepoBrowser
                     token={token}
+                    selectedRepoFullName={selectedRepo}
                     onSelectRepo={(url, branch) => {
                       setGitURL(url);
                       setGitBranch(branch);
-                      // Auto-fill project name from repo URL
+                      const match = url.match(/github\.com[:/]([^/]+\/[^/.]+)(\.git)?/);
+                      if (match) {
+                        setSelectedRepo(match[1]);
+                      }
                       const repoName = url.split('/').pop()?.replace('.git', '') || '';
                       if (repoName && !name) {
                         setName(repoName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
                       }
-                      // Auto-suggest subdomain
                       if (repoName && !subdomain) {
                         setSubdomain(repoName.toLowerCase().replace(/[^a-z0-9-]/g, ''));
                       }
                     }}
+                    onBranchChange={(branch) => {
+                      setGitBranch(branch);
+                    }}
                   />
 
-                  {/* Selected Repository Display */}
                   {gitURL && (
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
                       <p className="text-xs text-muted-foreground mb-1">Selected Repository:</p>
@@ -540,7 +343,6 @@ export default function NewProjectPage() {
                 </TabsContent>
 
                 <TabsContent value="manual" className="space-y-4 mt-4">
-                  {/* Git URL */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium" htmlFor="gitURL">
                       Repository URL
@@ -558,7 +360,6 @@ export default function NewProjectPage() {
                     </p>
                   </div>
 
-                  {/* Git Branch */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium" htmlFor="gitBranch">
                       Branch
@@ -598,6 +399,89 @@ export default function NewProjectPage() {
               </p>
             </div>
 
+            {/* Auto-Deploy Section */}
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center gap-2 text-sm">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-muted-foreground">Deployment Options</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <div className="p-4 rounded-lg border bg-muted/30 space-y-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="autoDeploy"
+                    checked={autoDeployEnabled}
+                    onChange={(e) => setAutoDeployEnabled(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-input cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="autoDeploy" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                      <Rocket className="h-4 w-4" />
+                      Auto-deploy after project creation
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Automatically trigger your first deployment to see your app live immediately
+                    </p>
+                  </div>
+                </div>
+
+                {autoDeployEnabled && (
+                  <div className="pl-7 space-y-3 pt-2">
+                    <Label className="text-sm font-medium">Deploy to:</Label>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                        <input
+                          type="radio"
+                          name="autoDeployEnv"
+                          value="STAGING"
+                          checked={autoDeployEnv === "STAGING"}
+                          onChange={() => setAutoDeployEnv("STAGING")}
+                          className="mt-0.5 h-4 w-4 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">Staging</span>
+                            <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Test environment for previewing changes before going live
+                          </p>
+                        </div>
+                      </label>
+
+                      <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                        <input
+                          type="radio"
+                          name="autoDeployEnv"
+                          value="PRODUCTION"
+                          checked={autoDeployEnv === "PRODUCTION"}
+                          onChange={() => setAutoDeployEnv("PRODUCTION")}
+                          className="mt-0.5 h-4 w-4 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">Production</span>
+                            <Badge variant="outline" className="text-xs">Live</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Deploy directly to production (choose if you're confident)
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="px-3 py-2 rounded-md bg-primary/5 border border-primary/20">
+                      <p className="text-xs text-muted-foreground">
+                        💡 <strong>Tip:</strong> We recommend deploying to Staging first to test your build before promoting to Production.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Submit */}
             <div className="pt-4">
               <Button
@@ -614,10 +498,19 @@ export default function NewProjectPage() {
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating Project...
+                    {autoDeployEnabled ? `Creating & Deploying to ${autoDeployEnv === 'PRODUCTION' ? 'Production' : 'Staging'}...` : 'Creating Project...'}
                   </>
                 ) : (
-                  "Create Project"
+                  <>
+                    {autoDeployEnabled ? (
+                      <>
+                        <Rocket className="w-4 h-4 mr-2" />
+                        Create & Deploy to {autoDeployEnv === 'PRODUCTION' ? 'Production' : 'Staging'}
+                      </>
+                    ) : (
+                      'Create Project'
+                    )}
+                  </>
                 )}
               </Button>
 

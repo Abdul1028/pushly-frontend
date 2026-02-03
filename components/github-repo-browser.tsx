@@ -1,13 +1,22 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Github, Loader2, RefreshCw, ExternalLink, Search } from "lucide-react";
+import { Github, Loader2, RefreshCw, ExternalLink, Search, GitBranch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 interface GitHubRepoBrowserProps {
     token: string | null;
     onSelectRepo: (repoUrl: string, defaultBranch: string) => void;
+    onBranchChange?: (branch: string) => void;
+    selectedRepoFullName?: string;
 }
 
 interface GitHubRepo {
@@ -23,10 +32,23 @@ interface GitHubRepo {
     stargazers_count?: number;
 }
 
-export function GitHubRepoBrowser({ token, onSelectRepo }: GitHubRepoBrowserProps) {
+interface GitHubBranch {
+    name: string;
+    commit: {
+        sha: string;
+    };
+    protected: boolean;
+}
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.wareality.tech';
+
+export function GitHubRepoBrowser({ token, onSelectRepo, onBranchChange, selectedRepoFullName }: GitHubRepoBrowserProps) {
     const [repos, setRepos] = useState<GitHubRepo[]>([]);
     const [filteredRepos, setFilteredRepos] = useState<GitHubRepo[]>([]);
+    const [branches, setBranches] = useState<GitHubBranch[]>([]);
+    const [selectedBranch, setSelectedBranch] = useState<string>("");
     const [loading, setLoading] = useState(false);
+    const [loadingBranches, setLoadingBranches] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [githubConnected, setGithubConnected] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -52,11 +74,18 @@ export function GitHubRepoBrowser({ token, onSelectRepo }: GitHubRepoBrowserProp
         }
     }, [searchQuery, repos]);
 
+    // Fetch branches when repo is selected
+    useEffect(() => {
+        if (selectedRepoFullName) {
+            fetchBranches(selectedRepoFullName);
+        }
+    }, [selectedRepoFullName]);
+
     const checkGitHubConnection = async () => {
         if (!token) return;
 
         try {
-            const response = await fetch('https://api.wareality.tech/api/users/github/status', {
+            const response = await fetch(`${BASE_URL}/api/users/github/status`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
@@ -79,7 +108,6 @@ export function GitHubRepoBrowser({ token, onSelectRepo }: GitHubRepoBrowserProp
         setError(null);
 
         try {
-            // Call Next.js API route with JWT in Authorization header
             const response = await fetch('/api/github/repos', {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -98,6 +126,40 @@ export function GitHubRepoBrowser({ token, onSelectRepo }: GitHubRepoBrowserProp
             setError(err?.message || "Failed to fetch repositories");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchBranches = async (fullName: string) => {
+        if (!token) return;
+
+        const [owner, repo] = fullName.split('/');
+        setLoadingBranches(true);
+
+        try {
+            const response = await fetch(`/api/github/repos/${owner}/${repo}/branches`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch branches');
+            }
+
+            const data = await response.json();
+            setBranches(data);
+        } catch (err: any) {
+            console.error('Failed to fetch branches:', err);
+            setBranches([]);
+        } finally {
+            setLoadingBranches(false);
+        }
+    };
+
+    const handleBranchChange = (branch: string) => {
+        setSelectedBranch(branch);
+        if (onBranchChange) {
+            onBranchChange(branch);
         }
     };
 
@@ -190,7 +252,10 @@ export function GitHubRepoBrowser({ token, onSelectRepo }: GitHubRepoBrowserProp
                     {filteredRepos.map((repo) => (
                         <button
                             key={repo.id}
-                            onClick={() => onSelectRepo(repo.clone_url, repo.default_branch)}
+                            onClick={() => {
+                                onSelectRepo(repo.clone_url, repo.default_branch);
+                                setSelectedBranch(repo.default_branch);
+                            }}
                             className="w-full p-3 text-left rounded-lg border hover:bg-accent hover:border-primary/50 transition-all group"
                         >
                             <div className="flex items-start justify-between gap-2">
@@ -229,6 +294,43 @@ export function GitHubRepoBrowser({ token, onSelectRepo }: GitHubRepoBrowserProp
                             </div>
                         </button>
                     ))}
+                </div>
+            )}
+
+            {/* Branch Selector */}
+            {selectedRepoFullName && branches.length > 0 && (
+                <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                    <div className="flex items-center gap-2">
+                        <GitBranch className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-medium">Select Branch</p>
+                    </div>
+                    <Select value={selectedBranch} onValueChange={handleBranchChange}>
+                        <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Select a branch" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {branches.map((branch) => (
+                                <SelectItem key={branch.name} value={branch.name}>
+                                    <div className="flex items-center gap-2">
+                                        <span>{branch.name}</span>
+                                        {branch.protected && (
+                                            <Badge variant="outline" className="text-xs">Protected</Badge>
+                                        )}
+                                    </div>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                        {branches.length} branch{branches.length !== 1 ? 'es' : ''} available
+                    </p>
+                </div>
+            )}
+
+            {loadingBranches && (
+                <div className="p-3 rounded-lg border bg-muted/30 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <p className="text-sm text-muted-foreground">Loading branches...</p>
                 </div>
             )}
         </div>
