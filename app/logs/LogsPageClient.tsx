@@ -89,8 +89,13 @@ export default function LogsPage() {
           if (!seenIdsRef.current.has(id)) {
             seenIdsRef.current.add(id);
             const ts = item?.timestamp ? new Date(item.timestamp).toLocaleString() : "";
-            const msg = typeof item?.message === "string" ? item.message : JSON.stringify(item?.message);
-            newLines.push(ts ? `[${ts}] ${msg}` : msg);
+            const raw = typeof item?.message === "string" ? item.message : JSON.stringify(item?.message);
+
+            // Fix 5: messages are batched as \n-separated lines — split each one
+            const lines = raw.split("\n").map((l: string) => l.trim()).filter(Boolean);
+            for (const line of lines) {
+              newLines.push(ts ? `[${ts}] ${line}` : line);
+            }
           }
         }
 
