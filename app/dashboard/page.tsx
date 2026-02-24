@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Activity, Settings, Github, GitBranch, ExternalLink } from "lucide-react";
 import { PRODUCT_DOMAIN } from "@/lib/config";
 import { ProjectSettingsDialog } from "@/components/project-settings-dialog";
+import { RedeployBanner } from "@/components/redeploy-banner";
 import useSWR from 'swr'
 
 
@@ -47,6 +48,8 @@ export default function DashboardPage() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showRedeployBanner, setShowRedeployBanner] = useState(false);
+  const [redeployProject, setRedeployProject] = useState<Project | null>(null);
   console.log("SSR running on:", typeof window === "undefined" ? "server" : "client")
   console.log("TOKEN:", token);
 
@@ -99,6 +102,17 @@ export default function DashboardPage() {
           </Link>
         </Button>
       </div>
+
+      {/* Redeploy banner — shown only after env vars change */}
+      {showRedeployBanner && redeployProject && (
+        <RedeployBanner
+          projectId={redeployProject.id}
+          gitBranch={redeployProject.gitBranch || "main"}
+          token={token}
+          onDismiss={() => setShowRedeployBanner(false)}
+          onDeployed={() => setShowRedeployBanner(false)}
+        />
+      )}
 
       {error && (
         <div className="max-w-6xl mx-auto mb-6">
@@ -261,11 +275,13 @@ export default function DashboardPage() {
           open={settingsOpen}
           onOpenChange={(open) => {
             setSettingsOpen(open);
-            if (!open) {
-              setSelectedProject(null);
-            }
+            if (!open) setSelectedProject(null);
           }}
           onProjectUpdated={() => mutate()}
+          onEnvVarsChanged={() => {
+            setRedeployProject(selectedProject);
+            setShowRedeployBanner(true);
+          }}
         />
       )}
     </div>

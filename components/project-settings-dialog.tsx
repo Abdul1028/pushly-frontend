@@ -46,6 +46,7 @@ interface ProjectSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onProjectUpdated?: () => void;
+  onEnvVarsChanged?: () => void;  // called only when env vars were actually modified
 }
 
 export function ProjectSettingsDialog({
@@ -53,6 +54,7 @@ export function ProjectSettingsDialog({
   open,
   onOpenChange,
   onProjectUpdated,
+  onEnvVarsChanged,
 }: ProjectSettingsDialogProps) {
   const router = useRouter();
   const { token } = useAuth();
@@ -81,6 +83,7 @@ export function ProjectSettingsDialog({
   // Env vars
   const [envVarsOpen, setEnvVarsOpen] = useState(false);
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
+  const [initialEnvVars, setInitialEnvVars] = useState<EnvVar[]>([]);
   const [loadingEnvVars, setLoadingEnvVars] = useState(false);
 
   // Subdomain validation states
@@ -116,6 +119,7 @@ export function ProjectSettingsDialog({
           ? data.map((e: any) => ({ key: e.key, value: e.value }))
           : [];
         setEnvVars(vars);
+        setInitialEnvVars(vars);  // snapshot for change detection
         if (vars.length > 0) setEnvVarsOpen(true);
       })
       .catch(() => setEnvVars([]))
@@ -199,6 +203,15 @@ export function ProjectSettingsDialog({
         body: JSON.stringify(cleanVars),
       });
 
+      // 3. Detect if env vars actually changed vs what was loaded
+      const envChanged =
+        cleanVars.length !== initialEnvVars.length ||
+        cleanVars.some(
+          (v, i) =>
+            v.key !== initialEnvVars[i]?.key ||
+            v.value !== initialEnvVars[i]?.value
+        );
+
       toast({
         title: "Success",
         description: "Project updated successfully",
@@ -207,6 +220,7 @@ export function ProjectSettingsDialog({
 
       onProjectUpdated?.();
       onOpenChange(false);
+      if (envChanged) onEnvVarsChanged?.();
     } catch (err: any) {
       const errorMessage = err?.message || "Failed to update project";
       setError(errorMessage);
