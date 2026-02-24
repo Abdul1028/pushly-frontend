@@ -12,22 +12,32 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, Loader2, CheckCircle2, XCircle, Settings2, ChevronDown, KeyRound } from "lucide-react";
 import { PRODUCT_DOMAIN } from "@/lib/config";
 import { useToast } from "@/components/ui/use-toast";
+import { EnvVarsEditor, EnvVar, RESERVED_ENV_KEYS } from "@/components/env-vars-editor";
 
 type Project = {
-  id: number;
+  id: string;
   name: string;
   description?: string;
   gitURL?: string;
   gitBranch?: string;
   subdomain?: string;
+  customBuildCommand?: string;
+  customInstallCommand?: string;
+  customOutputDirectory?: string;
   createdAt?: string;
 };
 
@@ -60,6 +70,19 @@ export function ProjectSettingsDialog({
   const [gitBranch, setGitBranch] = useState(project.gitBranch || "main");
   const [subdomain, setSubdomain] = useState(project.subdomain || "");
 
+  // Build config
+  const [buildConfigOpen, setBuildConfigOpen] = useState(
+    !!(project.customBuildCommand || project.customInstallCommand || project.customOutputDirectory)
+  );
+  const [customBuildCommand, setCustomBuildCommand] = useState(project.customBuildCommand || "");
+  const [customInstallCommand, setCustomInstallCommand] = useState(project.customInstallCommand || "");
+  const [customOutputDirectory, setCustomOutputDirectory] = useState(project.customOutputDirectory || "");
+
+  // Env vars
+  const [envVarsOpen, setEnvVarsOpen] = useState(false);
+  const [envVars, setEnvVars] = useState<EnvVar[]>([]);
+  const [loadingEnvVars, setLoadingEnvVars] = useState(false);
+
   // Subdomain validation states
   const [checkingSubdomain, setCheckingSubdomain] = useState(false);
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
@@ -73,11 +96,31 @@ export function ProjectSettingsDialog({
       setGitURL(project.gitURL || "");
       setGitBranch(project.gitBranch || "main");
       setSubdomain(project.subdomain || "");
+      setCustomBuildCommand(project.customBuildCommand || "");
+      setCustomInstallCommand(project.customInstallCommand || "");
+      setCustomOutputDirectory(project.customOutputDirectory || "");
+      setBuildConfigOpen(!!(project.customBuildCommand || project.customInstallCommand || project.customOutputDirectory));
       setError(null);
       setSubdomainAvailable(null);
       setSubdomainError(null);
     }
   }, [open, project]);
+
+  // Fetch env vars when dialog opens
+  useEffect(() => {
+    if (!open || !token) return;
+    setLoadingEnvVars(true);
+    apiFetchAuth(`/api/projects/${project.id}/env-vars`, token)
+      .then((data: any) => {
+        const vars = Array.isArray(data)
+          ? data.map((e: any) => ({ key: e.key, value: e.value }))
+          : [];
+        setEnvVars(vars);
+        if (vars.length > 0) setEnvVarsOpen(true);
+      })
+      .catch(() => setEnvVars([]))
+      .finally(() => setLoadingEnvVars(false));
+  }, [open, project.id, token]);
 
   // Debounced subdomain validation
   useEffect(() => {
@@ -132,6 +175,7 @@ export function ProjectSettingsDialog({
     setError(null);
 
     try {
+      // 1. Update project settings + build config
       await apiFetchAuth(`/api/projects/${project.id}`, token, {
         method: "PUT",
         body: JSON.stringify({
@@ -140,7 +184,19 @@ export function ProjectSettingsDialog({
           gitURL,
           gitBranch,
           subdomain,
+          customBuildCommand: customBuildCommand.trim() || null,
+          customInstallCommand: customInstallCommand.trim() || null,
+          customOutputDirectory: customOutputDirectory.trim() || null,
         }),
+      });
+
+      // 2. Bulk-sync env vars
+      const cleanVars = envVars.filter(
+        (v) => v.key.trim() && !RESERVED_ENV_KEYS.has(v.key.toUpperCase())
+      );
+      await apiFetchAuth(`/api/projects/${project.id}/env-vars`, token, {
+        method: "PUT",
+        body: JSON.stringify(cleanVars),
       });
 
       toast({
@@ -308,9 +364,114 @@ export function ProjectSettingsDialog({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="A brief description of your project"
                 disabled={loading}
-                rows={4}
+                rows={3}
               />
             </div>
+
+            {/* ── Build Configuration (collapsible) ── */}
+            <Collapsible open={buildConfigOpen} onOpenChange={setBuildConfigOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 text-sm group py-1"
+                >
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="flex items-center gap-1.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
+                    <Settings2 className="h-3.5 w-3.5" />
+                    Build Configuration
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform duration-200 ${buildConfigOpen ? "rotate-180" : ""
+                        }`}
+                    />
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-1">
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    Override the auto-detected build settings. Leave blank for automatic detection.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="s-installCmd" className="text-sm">Install Command</Label>
+                      <Input
+                        id="s-installCmd"
+                        value={customInstallCommand}
+                        onChange={(e) => setCustomInstallCommand(e.target.value)}
+                        placeholder="npm install"
+                        disabled={loading}
+                        className="h-9 font-mono text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="s-buildCmd" className="text-sm">Build Command</Label>
+                      <Input
+                        id="s-buildCmd"
+                        value={customBuildCommand}
+                        onChange={(e) => setCustomBuildCommand(e.target.value)}
+                        placeholder="npm run build"
+                        disabled={loading}
+                        className="h-9 font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="s-outputDir" className="text-sm">Output Directory</Label>
+                    <Input
+                      id="s-outputDir"
+                      value={customOutputDirectory}
+                      onChange={(e) => setCustomOutputDirectory(e.target.value)}
+                      placeholder="dist"
+                      disabled={loading}
+                      className="h-9 font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">e.g. dist, out, build, public</p>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* ── Environment Variables (collapsible) ── */}
+            <Collapsible open={envVarsOpen} onOpenChange={setEnvVarsOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 text-sm group py-1"
+                >
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="flex items-center gap-1.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
+                    <KeyRound className="h-3.5 w-3.5" />
+                    Environment Variables
+                    {loadingEnvVars ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : envVars.filter(v => v.key.trim()).length > 0 ? (
+                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                        {envVars.filter(v => v.key.trim()).length}
+                      </Badge>
+                    ) : null}
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform duration-200 ${envVarsOpen ? "rotate-180" : ""
+                        }`}
+                    />
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-1">
+                {loadingEnvVars ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <EnvVarsEditor
+                    value={envVars}
+                    onChange={setEnvVars}
+                    disabled={loading}
+                  />
+                )}
+              </CollapsibleContent>
+            </Collapsible>
 
             <Separator />
 

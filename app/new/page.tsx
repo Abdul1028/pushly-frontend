@@ -16,11 +16,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { PRODUCT_DOMAIN } from "@/lib/config";
-import { Check, X, Loader2, AlertCircle, ExternalLink, Info, Github, Rocket } from "lucide-react";
+import { Check, X, Loader2, AlertCircle, ExternalLink, Info, Github, Rocket, ChevronDown, Settings2, KeyRound } from "lucide-react";
 import { GitHubRepoBrowser } from "@/components/github-repo-browser";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { EnvVarsEditor, EnvVar, RESERVED_ENV_KEYS } from "@/components/env-vars-editor";
 
 /* ---------------- constants ---------------- */
 
@@ -49,6 +55,16 @@ export default function NewProjectPage() {
   const [gitBranch, setGitBranch] = useState("main");
   const [subdomain, setSubdomain] = useState("");
   const [selectedRepo, setSelectedRepo] = useState<string>("");
+
+  // Build config overrides
+  const [buildConfigOpen, setBuildConfigOpen] = useState(false);
+  const [customBuildCommand, setCustomBuildCommand] = useState("");
+  const [customInstallCommand, setCustomInstallCommand] = useState("");
+  const [customOutputDirectory, setCustomOutputDirectory] = useState("");
+
+  // Environment variables
+  const [envVarsOpen, setEnvVarsOpen] = useState(false);
+  const [envVariables, setEnvVariables] = useState<EnvVar[]>([]);
 
   // Auto-deploy options
   const [autoDeployEnabled, setAutoDeployEnabled] = useState(true);
@@ -120,6 +136,10 @@ export default function NewProjectPage() {
     setError(null);
 
     try {
+      // Filter out blank rows and reserved keys before sending
+      const cleanEnvVars = envVariables
+        .filter(v => v.key.trim() && !RESERVED_ENV_KEYS.has(v.key.toUpperCase()));
+
       const body = {
         name,
         description,
@@ -128,6 +148,10 @@ export default function NewProjectPage() {
         subdomain,
         autoDeployEnabled,
         autoDeployEnv: autoDeployEnabled ? autoDeployEnv : null,
+        customBuildCommand: customBuildCommand.trim() || null,
+        customInstallCommand: customInstallCommand.trim() || null,
+        customOutputDirectory: customOutputDirectory.trim() || null,
+        envVariables: cleanEnvVars.length > 0 ? cleanEnvVars : undefined,
       };
 
       const res = await apiFetchAuth<{
@@ -390,7 +414,7 @@ export default function NewProjectPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="A brief description of your project..."
-                rows={4}
+                rows={3}
                 disabled={loading}
                 className="resize-none text-sm"
               />
@@ -398,6 +422,120 @@ export default function NewProjectPage() {
                 Help your team understand what this project is for
               </p>
             </div>
+
+            {/* ── Build Configuration (collapsible) ── */}
+            <Collapsible open={buildConfigOpen} onOpenChange={setBuildConfigOpen}>
+              <div className="space-y-4 pt-2">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 text-sm group"
+                  >
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="flex items-center gap-1.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
+                      <Settings2 className="h-3.5 w-3.5" />
+                      Build Configuration
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform duration-200 ${buildConfigOpen ? "rotate-180" : ""
+                          }`}
+                      />
+                    </span>
+                    <div className="h-px flex-1 bg-border" />
+                  </button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent className="space-y-4">
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+                    <p className="text-xs text-muted-foreground">
+                      Override the auto-detected build settings. Leave blank to let Pushly detect them automatically from your framework.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="installCommand" className="text-sm font-medium">
+                          Install Command
+                        </Label>
+                        <Input
+                          id="installCommand"
+                          value={customInstallCommand}
+                          onChange={(e) => setCustomInstallCommand(e.target.value)}
+                          placeholder="npm install"
+                          disabled={loading}
+                          className="h-9 font-mono text-sm"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="buildCommand" className="text-sm font-medium">
+                          Build Command
+                        </Label>
+                        <Input
+                          id="buildCommand"
+                          value={customBuildCommand}
+                          onChange={(e) => setCustomBuildCommand(e.target.value)}
+                          placeholder="npm run build"
+                          disabled={loading}
+                          className="h-9 font-mono text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="outputDir" className="text-sm font-medium">
+                        Output Directory
+                      </Label>
+                      <Input
+                        id="outputDir"
+                        value={customOutputDirectory}
+                        onChange={(e) => setCustomOutputDirectory(e.target.value)}
+                        placeholder="dist"
+                        disabled={loading}
+                        className="h-9 font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        The folder your build outputs to (e.g. dist, out, build, public)
+                      </p>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+
+            {/* ── Environment Variables (collapsible) ── */}
+            <Collapsible open={envVarsOpen} onOpenChange={setEnvVarsOpen}>
+              <div className="space-y-4">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 text-sm group"
+                  >
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="flex items-center gap-1.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
+                      <KeyRound className="h-3.5 w-3.5" />
+                      Environment Variables
+                      {envVariables.filter(v => v.key.trim()).length > 0 && (
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                          {envVariables.filter(v => v.key.trim()).length}
+                        </Badge>
+                      )}
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform duration-200 ${envVarsOpen ? "rotate-180" : ""
+                          }`}
+                      />
+                    </span>
+                    <div className="h-px flex-1 bg-border" />
+                  </button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent>
+                  <EnvVarsEditor
+                    value={envVariables}
+                    onChange={setEnvVariables}
+                    disabled={loading}
+                  />
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
 
             {/* Auto-Deploy Section */}
             <div className="space-y-4 pt-2">
