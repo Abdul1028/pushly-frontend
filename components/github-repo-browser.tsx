@@ -176,6 +176,7 @@ export function GitHubRepoBrowser({ token, onSelectRepo, onBranchChange, selecte
                             Link your GitHub account in settings to quickly select repositories
                         </p>
                         <Button
+                            type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => window.location.href = "/settings"}
@@ -206,6 +207,7 @@ export function GitHubRepoBrowser({ token, onSelectRepo, onBranchChange, selecte
                     <Badge variant="secondary" className="text-xs">Connected</Badge>
                 </div>
                 <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
                     onClick={fetchRepos}
@@ -251,6 +253,7 @@ export function GitHubRepoBrowser({ token, onSelectRepo, onBranchChange, selecte
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
                     {filteredRepos.map((repo) => (
                         <button
+                            type="button"
                             key={repo.id}
                             onClick={() => {
                                 onSelectRepo(repo.clone_url, repo.default_branch);
