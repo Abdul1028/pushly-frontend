@@ -29,7 +29,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { EnvVarsEditor, EnvVar, RESERVED_ENV_KEYS } from "@/components/env-vars-editor";
 
 type Project = {
-  id: string;
+  id: number | string;
   name: string;
   description?: string;
   gitURL?: string;
