@@ -7,10 +7,10 @@ import { apiFetchAuth } from "../../lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, Activity, Settings, Github, GitBranch, ExternalLink } from "lucide-react";
+import { PlusCircle, Activity, Settings, Github, GitBranch, ExternalLink, Rocket } from "lucide-react";
 import { PRODUCT_DOMAIN } from "@/lib/config";
 import { ProjectSettingsDialog } from "@/components/project-settings-dialog";
-import { RedeployBanner } from "@/components/redeploy-banner";
+import { useToast } from "@/components/ui/use-toast";
 import useSWR from 'swr'
 
 
@@ -45,11 +45,46 @@ export default function DashboardPage() {
 
 
   const router = useRouter();
+  const { toast } = useToast();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [showRedeployBanner, setShowRedeployBanner] = useState(false);
-  const [redeployProject, setRedeployProject] = useState<Project | null>(null);
+
+  const triggerRedeploy = async (
+    environment: "STAGING" | "PRODUCTION",
+    projectId: number,
+    gitBranch: string,
+    dismissToast: () => void
+  ) => {
+    if (!token) return;
+    try {
+      const deployment = await apiFetchAuth<{ id: string }>(
+        `/api/projects/${projectId}/deployments`,
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            gitBranch: gitBranch || "main",
+            gitCommitHash: "REDEPLOYED",
+            environment,
+          }),
+        }
+      );
+      await apiFetchAuth(
+        `/api/projects/${projectId}/deployments/${deployment.id}/deploy?environment=${environment}`,
+        token,
+        { method: "POST" }
+      );
+      dismissToast();
+      router.push(`/logs?projectId=${projectId}&deploymentId=${deployment.id}`);
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Redeploy failed",
+        description: err?.message || "Could not trigger redeploy",
+      });
+    }
+  };
   console.log("SSR running on:", typeof window === "undefined" ? "server" : "client")
   console.log("TOKEN:", token);
 
@@ -102,17 +137,6 @@ export default function DashboardPage() {
           </Link>
         </Button>
       </div>
-
-      {/* Redeploy banner — shown only after env vars change */}
-      {showRedeployBanner && redeployProject && (
-        <RedeployBanner
-          projectId={redeployProject.id}
-          gitBranch={redeployProject.gitBranch || "main"}
-          token={token}
-          onDismiss={() => setShowRedeployBanner(false)}
-          onDeployed={() => setShowRedeployBanner(false)}
-        />
-      )}
 
       {error && (
         <div className="max-w-6xl mx-auto mb-6">
@@ -279,8 +303,39 @@ export default function DashboardPage() {
           }}
           onProjectUpdated={() => mutate()}
           onEnvVarsChanged={() => {
-            setRedeployProject(selectedProject);
-            setShowRedeployBanner(true);
+            const p = selectedProject;
+            const { id: toastId, dismiss } = toast({
+              title: "🔄 Environment variables updated",
+              description: (
+                <div className="space-y-3 mt-1">
+                  <p className="text-sm text-muted-foreground">
+                    Redeploy to apply the new values to your build.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => triggerRedeploy("STAGING", p.id, p.gitBranch || "main", dismiss)}
+                    >
+                      <Rocket className="h-3.5 w-3.5 mr-1.5" />
+                      Redeploy Staging
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => triggerRedeploy("PRODUCTION", p.id, p.gitBranch || "main", dismiss)}
+                    >
+                      <Rocket className="h-3.5 w-3.5 mr-1.5" />
+                      Redeploy Production
+                    </Button>
+                  </div>
+                </div>
+              ),
+              duration: Infinity,
+            });
           }}
         />
       )}
