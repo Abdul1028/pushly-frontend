@@ -8,6 +8,60 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Activity, Settings, Github, GitBranch, ExternalLink, Rocket } from "lucide-react";
+import { Loader2 } from "lucide-react";
+
+/* ── Small self-contained component so toast description has its own state ── */
+function RedeployButtons({
+  onRedeploy,
+}: {
+  onRedeploy: (env: "STAGING" | "PRODUCTION") => Promise<void>;
+}) {
+  const [loading, setLoading] = useState<"STAGING" | "PRODUCTION" | null>(null);
+
+  const handle = async (env: "STAGING" | "PRODUCTION") => {
+    setLoading(env);
+    try {
+      await onRedeploy(env);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  return (
+    <div className="flex gap-2 mt-2">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-8 text-xs"
+        disabled={!!loading}
+        onClick={() => handle("STAGING")}
+      >
+        {loading === "STAGING" ? (
+          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+        ) : (
+          <Rocket className="h-3.5 w-3.5 mr-1.5" />
+        )}
+        Redeploy Staging
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        className="h-8 text-xs"
+        disabled={!!loading}
+        onClick={() => handle("PRODUCTION")}
+      >
+        {loading === "PRODUCTION" ? (
+          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+        ) : (
+          <Rocket className="h-3.5 w-3.5 mr-1.5" />
+        )}
+        Redeploy Production
+      </Button>
+    </div>
+  );
+}
+
 import { PRODUCT_DOMAIN } from "@/lib/config";
 import { ProjectSettingsDialog } from "@/components/project-settings-dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -304,34 +358,18 @@ export default function DashboardPage() {
           onProjectUpdated={() => mutate()}
           onEnvVarsChanged={() => {
             const p = selectedProject;
-            const { id: toastId, dismiss } = toast({
+            const { dismiss } = toast({
               title: "🔄 Environment variables updated",
               description: (
-                <div className="space-y-3 mt-1">
+                <div className="space-y-1 mt-1">
                   <p className="text-sm text-muted-foreground">
                     Redeploy to apply the new values to your build.
                   </p>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs"
-                      onClick={() => triggerRedeploy("STAGING", p.id, p.gitBranch || "main", dismiss)}
-                    >
-                      <Rocket className="h-3.5 w-3.5 mr-1.5" />
-                      Redeploy Staging
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => triggerRedeploy("PRODUCTION", p.id, p.gitBranch || "main", dismiss)}
-                    >
-                      <Rocket className="h-3.5 w-3.5 mr-1.5" />
-                      Redeploy Production
-                    </Button>
-                  </div>
+                  <RedeployButtons
+                    onRedeploy={async (env) => {
+                      await triggerRedeploy(env, p.id, p.gitBranch || "main", dismiss);
+                    }}
+                  />
                 </div>
               ),
               duration: Infinity,
