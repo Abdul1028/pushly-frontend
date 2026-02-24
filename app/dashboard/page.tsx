@@ -111,26 +111,7 @@ export default function DashboardPage() {
   ) => {
     if (!token) return;
     try {
-      // Fetch real latest commit SHA from GitHub branch
-      let commitHash = "redeployed";
-      if (project.gitURL) {
-        try {
-          const match = project.gitURL.match(/github\.com[:/]([^/]+)\/([^/.]+)(\.git)?/);
-          if (match) {
-            const [, owner, repo] = match;
-            const branch = project.gitBranch || "main";
-            const branches = await apiFetchAuth<{ name: string; commit: { sha: string } }[]>(
-              `/api/github/repos/${owner}/${repo}/branches`,
-              token
-            );
-            const branchInfo = branches.find((b) => b.name === branch) ?? branches[0];
-            if (branchInfo?.commit?.sha) commitHash = branchInfo.commit.sha;
-          }
-        } catch {
-          // fall back to "redeployed" if GitHub API fails
-        }
-      }
-
+      // Build server will resolve the real commit SHA from git after cloning
       const deployment = await apiFetchAuth<{ id: string }>(
         `/api/projects/${project.id}/deployments`,
         token,
@@ -138,7 +119,7 @@ export default function DashboardPage() {
           method: "POST",
           body: JSON.stringify({
             gitBranch: project.gitBranch || "main",
-            gitCommitHash: commitHash,
+            gitCommitHash: "pending", // build server overwrites with real SHA via framework-detected callback
             environment,
           }),
         }
@@ -158,6 +139,7 @@ export default function DashboardPage() {
       });
     }
   };
+
 
   console.log("SSR running on:", typeof window === "undefined" ? "server" : "client")
   console.log("TOKEN:", token);

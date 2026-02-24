@@ -22,6 +22,7 @@ type Deployment = {
   environment?: string;
   lastAction?: 'DEPLOYED' | 'PROMOTED' | 'ROLLBACKED' | null;
   gitCommitHash?: string;
+  gitCommitMessage?: string;
   gitBranch?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -668,8 +669,40 @@ export default function ProjectPage() {
 
                                   {/* COMPACT DETAILS */}
                                   <CollapsibleContent>
-                                    <div className="px-4 sm:px-6 py-4 bg-white/[0.01] space-y-3 border-t border-white/10">
-                                      {/* Compact 2-column grid */}
+                                    <div className="px-4 sm:px-6 py-4 bg-white/[0.01] space-y-4 border-t border-white/10">
+
+                                      {/* Commit info block */}
+                                      {(d.gitCommitHash || d.gitCommitMessage) && (
+                                        <div className="rounded-md border border-white/8 bg-black/40 px-3 py-2.5 space-y-1.5">
+                                          {d.gitCommitHash && d.gitCommitHash !== 'pending' && (
+                                            <div className="flex items-start gap-2">
+                                              <GitCommitHorizontal className="h-3.5 w-3.5 text-neutral-500 mt-0.5 flex-shrink-0" />
+                                              <code
+                                                className="text-[11px] font-mono text-neutral-300 break-all leading-relaxed select-all"
+                                                title="Full commit SHA — click to select all"
+                                              >
+                                                {d.gitCommitHash}
+                                              </code>
+                                            </div>
+                                          )}
+                                          {d.gitCommitMessage && (
+                                            <div className="flex items-start gap-2">
+                                              <span className="text-neutral-500 mt-0.5 flex-shrink-0 text-[11px]">💬</span>
+                                              <span className="text-xs text-neutral-300 leading-relaxed">
+                                                {d.gitCommitMessage}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {d.gitBranch && (
+                                            <div className="flex items-center gap-2">
+                                              <GitBranch className="h-3.5 w-3.5 text-neutral-500 flex-shrink-0" />
+                                              <code className="text-[11px] font-mono text-neutral-400">{d.gitBranch}</code>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* Compact 2-column meta grid */}
                                       <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                                         {d.version && (
                                           <>
@@ -859,8 +892,40 @@ export default function ProjectPage() {
 
                                   {/* COMPACT DETAILS */}
                                   <CollapsibleContent>
-                                    <div className="px-4 sm:px-6 py-4 bg-white/[0.01] space-y-3 border-t border-white/10">
-                                      {/* Compact 2-column grid */}
+                                    <div className="px-4 sm:px-6 py-4 bg-white/[0.01] space-y-4 border-t border-white/10">
+
+                                      {/* Commit info block */}
+                                      {(d.gitCommitHash || d.gitCommitMessage) && (
+                                        <div className="rounded-md border border-white/8 bg-black/40 px-3 py-2.5 space-y-1.5">
+                                          {d.gitCommitHash && d.gitCommitHash !== 'pending' && (
+                                            <div className="flex items-start gap-2">
+                                              <GitCommitHorizontal className="h-3.5 w-3.5 text-neutral-500 mt-0.5 flex-shrink-0" />
+                                              <code
+                                                className="text-[11px] font-mono text-neutral-300 break-all leading-relaxed select-all"
+                                                title="Full commit SHA — click to select all"
+                                              >
+                                                {d.gitCommitHash}
+                                              </code>
+                                            </div>
+                                          )}
+                                          {d.gitCommitMessage && (
+                                            <div className="flex items-start gap-2">
+                                              <span className="text-neutral-500 mt-0.5 flex-shrink-0 text-[11px]">💬</span>
+                                              <span className="text-xs text-neutral-300 leading-relaxed">
+                                                {d.gitCommitMessage}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {d.gitBranch && (
+                                            <div className="flex items-center gap-2">
+                                              <GitBranch className="h-3.5 w-3.5 text-neutral-500 flex-shrink-0" />
+                                              <code className="text-[11px] font-mono text-neutral-400">{d.gitBranch}</code>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* Compact 2-column meta grid */}
                                       <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                                         {d.version && (
                                           <>
