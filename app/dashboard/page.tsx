@@ -106,31 +106,50 @@ export default function DashboardPage() {
 
   const triggerRedeploy = async (
     environment: "STAGING" | "PRODUCTION",
-    projectId: number,
-    gitBranch: string,
+    project: Project,
     dismissToast: () => void
   ) => {
     if (!token) return;
     try {
+      // Fetch real latest commit SHA from GitHub branch
+      let commitHash = "redeployed";
+      if (project.gitURL) {
+        try {
+          const match = project.gitURL.match(/github\.com[:/]([^/]+)\/([^/.]+)(\.git)?/);
+          if (match) {
+            const [, owner, repo] = match;
+            const branch = project.gitBranch || "main";
+            const branches = await apiFetchAuth<{ name: string; commit: { sha: string } }[]>(
+              `/api/github/repos/${owner}/${repo}/branches`,
+              token
+            );
+            const branchInfo = branches.find((b) => b.name === branch) ?? branches[0];
+            if (branchInfo?.commit?.sha) commitHash = branchInfo.commit.sha;
+          }
+        } catch {
+          // fall back to "redeployed" if GitHub API fails
+        }
+      }
+
       const deployment = await apiFetchAuth<{ id: string }>(
-        `/api/projects/${projectId}/deployments`,
+        `/api/projects/${project.id}/deployments`,
         token,
         {
           method: "POST",
           body: JSON.stringify({
-            gitBranch: gitBranch || "main",
-            gitCommitHash: "REDEPLOYED",
+            gitBranch: project.gitBranch || "main",
+            gitCommitHash: commitHash,
             environment,
           }),
         }
       );
       await apiFetchAuth(
-        `/api/projects/${projectId}/deployments/${deployment.id}/deploy?environment=${environment}`,
+        `/api/projects/${project.id}/deployments/${deployment.id}/deploy?environment=${environment}`,
         token,
         { method: "POST" }
       );
       dismissToast();
-      router.push(`/logs?projectId=${projectId}&deploymentId=${deployment.id}`);
+      router.push(`/logs?projectId=${project.id}&deploymentId=${deployment.id}`);
     } catch (err: any) {
       toast({
         variant: "destructive",
@@ -139,6 +158,7 @@ export default function DashboardPage() {
       });
     }
   };
+
   console.log("SSR running on:", typeof window === "undefined" ? "server" : "client")
   console.log("TOKEN:", token);
 
@@ -367,7 +387,7 @@ export default function DashboardPage() {
                   </p>
                   <RedeployButtons
                     onRedeploy={async (env) => {
-                      await triggerRedeploy(env, p.id, p.gitBranch || "main", dismiss);
+                      await triggerRedeploy(env, p, dismiss);
                     }}
                   />
                 </div>
