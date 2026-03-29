@@ -23,7 +23,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Loader2, CheckCircle2, XCircle, Settings2, ChevronDown, KeyRound } from "lucide-react";
+import { AlertTriangle, Loader2, CheckCircle2, XCircle, Settings2, ChevronDown, KeyRound, Globe } from "lucide-react";
+
 import { PRODUCT_DOMAIN } from "@/lib/config";
 import { useToast } from "@/components/ui/use-toast";
 import { EnvVarsEditor, EnvVar, RESERVED_ENV_KEYS } from "@/components/env-vars-editor";
@@ -487,7 +488,25 @@ export function ProjectSettingsDialog({
               </CollapsibleContent>
             </Collapsible>
 
+            {/* ── Custom Domain (navigation link) ── */}
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 text-sm group py-1"
+              onClick={() => {
+                onOpenChange(false);
+                router.push(`/project/${project.id}/domain`);
+              }}
+            >
+              <div className="h-px flex-1 bg-border" />
+              <span className="flex items-center gap-1.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
+                <Globe className="h-3.5 w-3.5" />
+                Custom Domain
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </button>
+
             <Separator />
+
 
             <div className="space-y-4">
               <div>
