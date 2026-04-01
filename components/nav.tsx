@@ -37,22 +37,32 @@ export function Nav() {
           {/* Extreme Left */}
 
           <Link href="/" className="md:ml-6">
-            <Brand incomingText={PRODUCT_NAME} />
+            GITWAY
           </Link>
 
           {/* Center Links (Desktop only) */}
-          <div className="hidden md:flex flex-1 justify-center items-center gap-8">
-            <Link href="#deploy" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hover:scale-105 transform">Deploy</Link>
-            <Link href="#cicd" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hover:scale-105 transform">CI/CD</Link>
-            <Link href="https://developers.wareality.tech" target="_blank" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hover:scale-105 transform">Docs</Link>
+          <div className="hidden md:flex flex-1 justify-center items-center gap-10">
+            <Link href="#deploy" className="group relative text-[15px] font-medium text-zinc-400 hover:text-emerald-400 transition-colors py-1">
+              Deploy
+              <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-emerald-400 transition-all duration-300 group-hover:w-full" />
+            </Link>
+            <Link href="#cicd" className="group relative text-[15px] font-medium text-zinc-400 hover:text-cyan-400 transition-colors py-1">
+              CI/CD
+              <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-cyan-400 transition-all duration-300 group-hover:w-full" />
+            </Link>
+            <Link href="https://developers.wareality.tech" target="_blank" className="group relative text-[15px] font-medium text-zinc-400 hover:text-blue-400 transition-colors py-1">
+              Docs
+              <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-blue-400 transition-all duration-300 group-hover:w-full" />
+            </Link>
           </div>
 
           <div className="flex-1 md:hidden" />
 
           {/* Extreme Right (Desktop only) */}
-          <div className="hidden md:flex items-center gap-6 md:mr-2">
-            <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <div className="hidden md:flex items-center gap-8 md:mr-2">
+            <Link href="/login" className="group relative text-[15px] font-medium text-zinc-400 hover:text-white transition-colors py-1">
               Login
+              <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-white transition-all duration-300 group-hover:w-full" />
             </Link>
             <Button size="sm" onClick={() => router.push("/register")} className="rounded-full px-6 bg-white text-black hover:bg-zinc-200 font-semibold shadow-xl shadow-white/5 hover:-translate-y-0.5 transition-all">
               Get Started
