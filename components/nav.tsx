@@ -4,7 +4,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Moon, Sun, LayoutDashboard, Settings, PlusCircle, Menu, X } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
@@ -25,9 +25,76 @@ export function Nav() {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const { status } = useAuth()
+  const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  if (status !== "authenticated") return null
+  if (status === "loading") return null
+
+  if (status !== "authenticated") {
+    return (
+      <nav className="border-b border-white/5 bg-background/60 backdrop-blur-2xl sticky top-0 z-50">
+        <div className="flex h-16 items-center w-full px-4 md:px-8 max-w-7xl mx-auto">
+          {/* Extreme Left */}
+
+          <Link href="/" className="md:ml-6">
+            <Brand incomingText={PRODUCT_NAME} />
+          </Link>
+
+          {/* Center Links (Desktop only) */}
+          <div className="hidden md:flex flex-1 justify-center items-center gap-8">
+            <Link href="#deploy" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hover:scale-105 transform">Deploy</Link>
+            <Link href="#cicd" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hover:scale-105 transform">CI/CD</Link>
+            <Link href="https://developers.wareality.tech" target="_blank" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hover:scale-105 transform">Docs</Link>
+          </div>
+
+          <div className="flex-1 md:hidden" />
+
+          {/* Extreme Right (Desktop only) */}
+          <div className="hidden md:flex items-center gap-6 md:mr-2">
+            <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              Login
+            </Link>
+            <Button size="sm" onClick={() => router.push("/register")} className="rounded-full px-6 bg-white text-black hover:bg-zinc-200 font-semibold shadow-xl shadow-white/5 hover:-translate-y-0.5 transition-all">
+              Get Started
+            </Button>
+          </div>
+
+          {/* Mobile Menu Toggle */}
+          <div className="flex md:hidden items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="h-10 w-10 text-muted-foreground hover:text-foreground"
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              <span className="sr-only">Toggle menu</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-white/5 bg-background/95 backdrop-blur-xl absolute w-full left-0 shadow-2xl">
+            <div className="px-6 py-8 flex flex-col gap-5">
+              <Link href="#deploy" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-muted-foreground hover:text-foreground p-2 rounded-xl hover:bg-white/5 transition-colors">Deploy</Link>
+              <Link href="#cicd" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-muted-foreground hover:text-foreground p-2 rounded-xl hover:bg-white/5 transition-colors">CI/CD</Link>
+              <Link href="https://developers.wareality.tech" onClick={() => setMobileMenuOpen(false)} target="_blank" className="text-lg font-medium text-muted-foreground hover:text-foreground p-2 rounded-xl hover:bg-white/5 transition-colors">Docs</Link>
+
+              <Separator className="my-4 bg-white/10" />
+
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="text-lg font-medium text-center text-muted-foreground hover:text-foreground p-2 rounded-xl hover:bg-white/5 transition-colors">
+                Login
+              </Link>
+              <Button size="lg" onClick={() => { setMobileMenuOpen(false); router.push("/register"); }} className="w-full mt-2 rounded-xl font-bold shadow-md bg-white text-black hover:bg-zinc-200 py-6 text-lg">
+                Get Started
+              </Button>
+            </div>
+          </div>
+        )}
+      </nav>
+    )
+  }
 
   return (
     <nav className="border-b bg-background/70 backdrop-blur-xl sticky top-0 z-50">
