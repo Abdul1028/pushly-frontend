@@ -49,9 +49,9 @@ export function SslSecuritySection() {
   }, [fullText]);
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 border border-border/50 rounded-3xl overflow-hidden relative">
-      {/* Top: Text Content */}
-      <div className="flex flex-col items-start text-left pt-8 px-8 md:pt-10 md:px-10 z-20">
+    <div className="flex flex-col md:flex-row xl:flex-col h-full bg-zinc-950 border border-border/50 rounded-3xl overflow-hidden relative">
+      {/* Text Content */}
+      <div className="flex flex-col items-start text-left pt-8 px-8 md:p-10 xl:pt-8 xl:px-8 z-20 md:w-1/2 xl:w-full justify-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-6">
           <ShieldCheck size={14} /> Built-in Security
         </div>
@@ -63,8 +63,8 @@ export function SslSecuritySection() {
         <ul className="space-y-3">
           {[
             "Auto generates and renews Let's Encrypt certificates",
-            "Wildcard SSL for custom domains",
-            "Automated HTTP to HTTPS redirection",
+            "Wildcard SSL/TLS for all custom hostnames",
+            "Modern TLS 1.3 encryption enabled by default",
           ].map((feature, idx) => (
             <li key={idx} className="flex items-center gap-3 text-sm text-foreground/80">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -74,8 +74,8 @@ export function SslSecuritySection() {
         </ul>
       </div>
 
-      {/* Bottom: The Browser Mockup */}
-      <div className="relative w-full h-[350px] shrink-0 flex items-center justify-center mt-auto overflow-hidden ">
+      {/* The Browser Mockup */}
+      <div className="relative w-full h-[350px] shrink-0 md:h-auto xl:h-[350px] md:w-1/2 xl:w-full flex items-center justify-center mt-auto md:mt-0 xl:mt-auto overflow-hidden p-8 md:py-10 md:px-8 xl:p-0">
         {/* Glow behind */}
         <div className="absolute inset-0 bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none -z-10" />
 

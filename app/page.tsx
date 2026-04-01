@@ -11,6 +11,7 @@ import { FrameworksAutoDetect } from "@/components/frameworks-auto-detect";
 import { CustomConfigSection } from "@/components/custom-config-section";
 import { GlobalEdgeSection } from "@/components/global-edge-section";
 import { SslSecuritySection } from "@/components/ssl-security-section";
+import { RealTimeLogsSection } from "@/components/realtime-logs-section";
 import GlobeDemo from "@/components/globe-demo";
 import {
   Code,
@@ -128,38 +129,9 @@ export default function Home() {
       </section>
 
 
-
-
-
-
       {/* Real-time Logs Feature */}
-      <section>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
-          <Card className="max-w-4xl mx-auto">
-            <CardHeader>
-              <div className="flex items-center gap-2 mb-2">
-                <Terminal className="h-6 w-6 text-primary" />
-                <CardTitle className="text-2xl">Real-time Logs</CardTitle>
-              </div>
-              <CardDescription className="text-base">
-                Monitor your deployments with live streaming logs
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-background border rounded-lg p-4 font-mono text-sm overflow-x-auto">
-                <div className="text-muted-foreground">
-                  <span className="text-green-500">$</span> {PRODUCT_NAME.toLowerCase()} deploy
-                </div>
-                <div className="mt-2 space-y-1">
-                  <div className="text-blue-400">→ Building your project...</div>
-                  <div className="text-green-400">✓ Build completed successfully</div>
-                  <div className="text-blue-400">→ Deploying to production...</div>
-                  <div className="text-green-400">✓ Your webapp is now live!</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-24 w-full max-w-7xl">
+        <RealTimeLogsSection />
       </section>
 
       {/* CTA Section */}

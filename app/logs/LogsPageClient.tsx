@@ -7,7 +7,67 @@ import { apiFetchAuth } from "../../lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ExternalLink, ArrowLeft } from "lucide-react";
+import { CheckCircle2, ExternalLink, ArrowLeft, Terminal } from "lucide-react";
+
+const renderRealLogLine = (line: string, idx: number) => {
+  if (!line) return null;
+  const match = line.match(/^(\[\d+\/\d+\/\d+, \d+:\d+:\d+ [AP]M\])\s?(.*)/);
+
+  if (match) {
+    const timestamp = match[1];
+    const content = match[2];
+
+    let contentEl: React.ReactNode = <span className="text-zinc-300">{content}</span>;
+
+    // Syntax highlighting logic
+    if (content.includes("View it at") || content.includes("http")) {
+      const urlMatch = content.match(/(https?:\/\/[^\s]+)/);
+      if (urlMatch) {
+        const url = urlMatch[1];
+        const parts = content.split(url);
+        contentEl = (
+          <span className="text-emerald-400 font-medium">
+            {parts[0]}
+            <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline underline-offset-4 hover:text-white transition-colors relative z-20">
+              {url}
+            </a>
+            {parts[1]}
+          </span>
+        );
+      }
+    } else if (content.includes("✅") || content.includes("done") || content.includes("✨") || content.includes("🚀") || content.includes("✓")) {
+      contentEl = <span className="text-emerald-400 font-medium">{content}</span>;
+    } else if (content.includes("Progress:") || content.includes("Framework:") || content.includes("Build Command:") || content.includes("→")) {
+      contentEl = <span className="text-cyan-400">{content}</span>;
+    } else if (content.includes("Update available!") || content.includes("│") || content.includes("╭") || content.includes("╰")) {
+      contentEl = <span className="text-yellow-400">{content}</span>;
+    } else if (content.includes("🔨") || content.includes("📥") || content.includes("Install Command:")) {
+      contentEl = <span className="text-blue-400">{content}</span>;
+    }
+
+    return (
+      <div className="font-mono text-[13px] leading-snug break-all hover:bg-white/5 px-4 md:px-6 py-0.5 rounded transition-colors group cursor-crosshair flex">
+        <span className="text-zinc-600 mr-2 shrink-0 inline-block w-[35px] text-right">
+          [{idx + 1}]
+        </span>
+        <span className="text-zinc-600 mr-3 truncate shrink-0 inline-block group-hover:text-zinc-400 transition-colors w-[180px]">
+          {timestamp}
+        </span>
+        <div className="flex-1">{contentEl}</div>
+      </div>
+    );
+  }
+
+  // Fallback for lines without timestamp
+  return (
+    <div className="font-mono text-[13px] leading-snug break-all hover:bg-white/5 px-4 md:px-6 py-0.5 rounded transition-colors group cursor-crosshair flex">
+      <span className="text-zinc-600 mr-2 shrink-0 inline-block w-[35px] text-right">
+        [{idx + 1}]
+      </span>
+      <div className="text-zinc-300 flex-1">{line}</div>
+    </div>
+  );
+};
 
 export default function LogsPage() {
   const params = useSearchParams();
@@ -21,9 +81,9 @@ export default function LogsPage() {
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
 
-  // New: Track deployment status
   const [deploymentStatus, setDeploymentStatus] = useState<string | null>(null);
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
   const scrollToBottom = useCallback(() => {
@@ -53,10 +113,24 @@ export default function LogsPage() {
           setIsPaused(true); // Stop log fetching
         }
       }
+
+      // Fetch project name if not already fetched
+      if (!projectName) {
+        try {
+          const proj = await apiFetchAuth<{ name?: string }>(`/api/projects/${projectId}`, token);
+          if (proj.name) {
+            setProjectName(proj.name);
+          }
+        } catch(e) {
+          // ignore error, fallback to ID
+          setProjectName(projectId);
+        }
+      }
+
     } catch (e: any) {
       console.error("Failed to fetch deployment status:", e);
     }
-  }, [projectId, deploymentId, token, status]);
+  }, [projectId, deploymentId, token, status, projectName]);
 
   const fetchLogs = useCallback(async () => {
     if (!projectId || !deploymentId || status !== "authenticated" || !token || isPaused) return;
@@ -188,14 +262,14 @@ export default function LogsPage() {
     }
 
     if (logs.length === 0) {
-      return <p className="text-muted-foreground">No logs available yet.</p>;
+      return <div className="p-6 text-zinc-500 font-mono text-[13px]">Waiting for active terminal stream...</div>;
     }
 
     return (
-      <div className="space-y-1">
+      <div className="flex-1 py-4 overflow-y-auto overflow-x-hidden scroll-smooth scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent custom-scrollbar">
         {logs.map((line, idx) => (
-          <div key={idx} className="whitespace-pre-wrap break-words text-sm font-mono leading-relaxed">
-            <span className="text-muted-foreground">[{idx + 1}]</span> {line}
+          <div key={idx}>
+            {renderRealLogLine(line, idx)}
           </div>
         ))}
         <div ref={logsEndRef} />
@@ -276,46 +350,69 @@ export default function LogsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
-      <Card className="max-w-5xl mx-auto">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Deployment Logs
-                {deploymentStatus && (
-                  <span className={`text-sm px-2 py-1 rounded-full ${deploymentStatus === "DEPLOYING" || deploymentStatus === "RUNNING"
-                    ? "bg-blue-500/10 text-blue-500"
-                    : deploymentStatus === "SUCCESS" || deploymentStatus === "COMPLETED"
-                      ? "bg-green-500/10 text-green-500"
-                      : deploymentStatus === "FAILED"
-                        ? "bg-red-500/10 text-red-500"
-                        : "bg-gray-500/10 text-gray-500"
-                    }`}>
-                    {deploymentStatus}
-                  </span>
-                )}
-              </CardTitle>
-              <CardDescription>
-                {projectId && deploymentId
-                  ? `Project: ${projectId} • Deployment: ${deploymentId}`
-                  : "View deployment logs"}
-              </CardDescription>
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 max-w-7xl">
+
+      {/* Header Area */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            Project Logs
+            {deploymentStatus && (
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${deploymentStatus === "DEPLOYING" || deploymentStatus === "RUNNING"
+                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                : deploymentStatus === "SUCCESS" || deploymentStatus === "COMPLETED"
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                  : deploymentStatus === "FAILED"
+                    ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                    : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
+                }`}>
+                {deploymentStatus}
+              </span>
+            )}
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {projectId && deploymentId
+              ? `Streaming real-time output for ${projectName || projectId} on deployment id: ${deploymentId}`
+              : "View deployment logs"}
+          </p>
+        </div>
+        <button
+          onClick={() => setIsPaused(!isPaused)}
+          className="text-xs font-semibold px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-foreground transition-colors"
+        >
+          {isPaused ? "▶ Resume Stream" : "⏸ Pause Stream"}
+        </button>
+      </div>
+
+      {/* Terminal Window */}
+      <div className="w-full h-[65vh] min-h-[500px] max-h-[800px]">
+        <div className="bg-[#0c0c0e] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-full w-full relative">
+
+          {/* Top Traffic Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#18181b] z-10 relative">
+            <div className="flex items-center gap-2">
+              <Terminal size={14} className="text-zinc-500" />
+              <span className="text-xs font-medium text-zinc-400">
+                {projectName ? `${projectName} - production logs` : `bash - production logs`}
+              </span>
             </div>
-            <button
-              onClick={() => setIsPaused(!isPaused)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {isPaused ? "▶ Resume" : "⏸ Pause"}
-            </button>
+            <div className="flex gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
+              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-muted/50 rounded-lg border p-4 max-h-[70vh] overflow-auto font-mono text-xs">
+
+          {/* Log Stream Body */}
+          <div className="flex flex-col flex-1 overflow-hidden relative z-10">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,180,255,0.01),transparent_80%)] pointer-events-none" />
+
+            {/* Real Content via displayContent */}
             {displayContent}
+
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

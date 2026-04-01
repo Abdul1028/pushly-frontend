@@ -398,9 +398,9 @@ export function GlobalEdgeSection() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 border border-border/50 rounded-3xl overflow-hidden relative">
-      {/* Top: Text Content */}
-      <div className="flex flex-col items-start text-left pt-8 px-8 md:pt-10 md:px-10 z-20">
+    <div className="flex flex-col md:flex-row xl:flex-col h-full bg-zinc-950 border border-border/50 rounded-3xl overflow-hidden relative">
+      {/* Text Content */}
+      <div className="flex flex-col items-start text-left pt-8 px-8 md:p-10 xl:pt-8 xl:px-8 z-20 md:w-1/2 xl:w-full justify-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-6">
           <GlobeIcon size={14} /> Edge Delivery Network
         </div>
@@ -416,8 +416,8 @@ export function GlobalEdgeSection() {
 
       </div>
 
-      {/* Bottom: Globe */}
-      <div className="relative w-full h-[280px] shrink-0 hidden md:flex items-center justify-center mt-auto overflow-hidden pb-8">
+      {/* Globe */}
+      <div className="relative w-full h-[280px] shrink-0 md:h-auto xl:h-[280px] md:w-1/2 xl:w-full hidden md:flex items-center justify-center mt-auto md:mt-0 xl:mt-auto overflow-hidden pb-8 md:pb-0 xl:pb-8">
         {/* Glow behind globe */}
         <div className="absolute inset-0 bg-white/5 blur-[100px] rounded-full pointer-events-none -z-10" />
 
