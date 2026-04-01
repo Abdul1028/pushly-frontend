@@ -9,6 +9,9 @@ import { SystemStatus } from "@/components/system-status";
 import { DeployPipelineAnimation } from "@/components/deploy-pipeline-animation";
 import { FrameworksAutoDetect } from "@/components/frameworks-auto-detect";
 import { CustomConfigSection } from "@/components/custom-config-section";
+import { GlobalEdgeSection } from "@/components/global-edge-section";
+import { SslSecuritySection } from "@/components/ssl-security-section";
+import GlobeDemo from "@/components/globe-demo";
 import {
   Code,
   Terminal,
@@ -157,6 +160,11 @@ export default function Home() {
       {/* Custom gitway.config.json Section */}
       <CustomConfigSection />
 
+      {/* Global Edge / Cloudflare Section */}
+      {/* <GlobalEdgeSection /> */}
+
+
+
       {/* Features Grid */}
       <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
         <div className="text-center mb-12 max-w-3xl mx-auto">
@@ -254,6 +262,14 @@ export default function Home() {
           </CardContent>
         </Card>
       </section>
+
+      <SslSecuritySection />
+
+      <section>
+        <GlobalEdgeSection />
+      </section>
+
+
     </div>
   );
 }
