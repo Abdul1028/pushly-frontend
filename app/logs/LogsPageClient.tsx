@@ -83,7 +83,6 @@ export default function LogsPage() {
 
   const [deploymentStatus, setDeploymentStatus] = useState<string | null>(null);
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
-  const [projectName, setProjectName] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
   const scrollToBottom = useCallback(() => {
@@ -114,23 +113,10 @@ export default function LogsPage() {
         }
       }
 
-      // Fetch project name if not already fetched
-      if (!projectName) {
-        try {
-          const proj = await apiFetchAuth<{ name?: string }>(`/api/projects/${projectId}`, token);
-          if (proj.name) {
-            setProjectName(proj.name);
-          }
-        } catch(e) {
-          // ignore error, fallback to ID
-          setProjectName(projectId);
-        }
-      }
-
     } catch (e: any) {
       console.error("Failed to fetch deployment status:", e);
     }
-  }, [projectId, deploymentId, token, status, projectName]);
+  }, [projectId, deploymentId, token, status]);
 
   const fetchLogs = useCallback(async () => {
     if (!projectId || !deploymentId || status !== "authenticated" || !token || isPaused) return;
@@ -372,7 +358,7 @@ export default function LogsPage() {
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             {projectId && deploymentId
-              ? `Streaming real-time output for ${projectName || projectId} on deployment id: ${deploymentId}`
+              ? `Streaming real-time output for deployment id: ${deploymentId}`
               : "View deployment logs"}
           </p>
         </div>
@@ -393,7 +379,7 @@ export default function LogsPage() {
             <div className="flex items-center gap-2">
               <Terminal size={14} className="text-zinc-500" />
               <span className="text-xs font-medium text-zinc-400">
-                {projectName ? `${projectName} - production logs` : `bash - production logs`}
+                {deploymentId ? `deployment-${deploymentId} - logs` : `bash - production logs`}
               </span>
             </div>
             <div className="flex gap-2">

@@ -12,6 +12,7 @@ import { CustomConfigSection } from "@/components/custom-config-section";
 import { GlobalEdgeSection } from "@/components/global-edge-section";
 import { SslSecuritySection } from "@/components/ssl-security-section";
 import { RealTimeLogsSection } from "@/components/realtime-logs-section";
+import { CicdPipelineSection } from "@/components/cicd-pipeline-section";
 import GlobeDemo from "@/components/globe-demo";
 import {
   Code,
@@ -52,7 +53,7 @@ export default function Home() {
       </div>
 
       {/* ── Hero Section — Immersive Animated (Stitch Design) ── */}
-      <section className="relative overflow-hidden bg-background py-6 lg:py-8 flex items-center">
+      <section className="relative overflow-hidden bg-background py-27 lg:py-10 flex items-center">
 
         <div className=" mx-auto px-4 sm:px-8 lg:px-10 w-full max-w-7xl relative z-10">
           <div className="grid lg:grid-cols-2 gap-8 items-center">
@@ -134,40 +135,58 @@ export default function Home() {
         <RealTimeLogsSection />
       </section>
 
+      {/* CI/CD Pipeline Section */}
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-24 w-full max-w-7xl">
+        <CicdPipelineSection />
+      </section>
+
       {/* CTA Section */}
-      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
-        <Card className="bg-primary text-primary-foreground border-primary max-w-4xl mx-auto">
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl mb-4">Ready to Make Your Webapp Live?</CardTitle>
-            <CardDescription className="text-primary-foreground/80 text-lg">
-              Join developers who trust {PRODUCT_NAME} to deploy their projects
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
-            <div className="flex flex-wrap justify-center gap-2 mb-4">
-              {[
-                "Zero configuration",
-                "Instant deployments",
-                "Real-time monitoring",
-                "Global CDN",
-              ].map((item) => (
-                <Badge key={item} variant="secondary" className="bg-primary-foreground/10 text-primary-foreground">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  {item}
-                </Badge>
-              ))}
-            </div>
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-24 w-full max-w-7xl">
+        <div className="relative rounded-3xl overflow-hidden bg-zinc-950 border border-white/10 px-6 py-20 text-center shadow-2xl">
+          {/* Subtle background glow */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,0.1),transparent_70%)] pointer-events-none" />
+
+          <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-6 relative z-10">
+            Ready to make your webapp <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-500">live?</span>
+          </h2>
+
+          <p className="text-zinc-400 text-lg md:text-xl max-w-2xl mx-auto mb-10 relative z-10 leading-relaxed">
+            Join the developers who trust {PRODUCT_NAME} for their frontend infrastructure. Built for absolute speed, zero configuration, and global scale.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
             <Button
               size="lg"
-              variant="secondary"
               onClick={() => router.push("/register")}
-              className="text-lg px-8"
+              className="w-full sm:w-auto text-base px-8 py-6 rounded-full bg-white text-black hover:bg-zinc-200 transition-colors gap-2 font-semibold"
             >
-              Get Started Free
-              <ArrowRight className="ml-2 h-4 w-4" />
+              Start Deploying for Free
+              <ArrowRight className="h-4 w-4" />
             </Button>
-          </CardContent>
-        </Card>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => router.push("/login")}
+              className="w-full sm:w-auto text-base px-8 py-6 rounded-full border border-white/10 text-white hover:text-white hover:bg-white/5 transition-colors font-medium bg-transparent"
+            >
+              Sign In
+            </Button>
+          </div>
+
+          <div className="mt-12 flex flex-wrap justify-center gap-6 text-sm text-zinc-500 font-medium relative z-10">
+            {[
+              "Zero configuration",
+              "Global Edge Network",
+              "Automatic SSL/TLS",
+              "CI/CD Pipelines",
+            ].map((item) => (
+              <span key={item} className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-violet-500" />
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
       </section>
 
 
