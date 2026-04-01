@@ -398,56 +398,39 @@ export function GlobalEdgeSection() {
   };
 
   return (
-    <section className="w-full py-24 relative overflow-hidden bg-[#050505] border-b border-border/50">
-      <div className="container mx-auto px-6 max-w-6xl relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-
-          {/* Left: Text Content */}
-          <div className="flex flex-col items-start text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-6">
-              <GlobeIcon size={14} /> Edge Delivery Network
-            </div>
-
-            <h2 className="text-3xl tracking-tight font-bold mb-5 text-foreground">
-              Always <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">close to your users.</span>
-            </h2>
-
-            <p className="text-muted-foreground text-[15px] leading-relaxed mb-8 max-w-md">
-              Powered by Cloudflare, your web application and all its static assets are immediately cached and served from 300+ global edge locations. Enjoy sub-50ms latency regardless of where your traffic comes from.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
-              <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
-                <Zap className="text-yellow-400 mb-3" size={20} />
-                <h4 className="text-sm font-semibold text-white mb-1">Instant Invocation</h4>
-                <p className="text-xs text-muted-foreground">Automated cache invalidation on every deployment.</p>
-              </div>
-              <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
-                <ShieldCheck className="text-emerald-400 mb-3" size={20} />
-                <h4 className="text-sm font-semibold text-white mb-1">Enterprise CDN</h4>
-                <p className="text-xs text-muted-foreground">State of the art DDoS protection built-in by default.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Globe */}
-          <div className="relative w-full aspect-square flex items-center justify-center min-h-[400px]">
-            {/* Glow behind globe */}
-            <div className="absolute inset-0 bg-white/5 blur-[100px] rounded-full pointer-events-none -z-10" />
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className="w-full h-full absolute inset-0 max-w-[500px] max-h-[500px] m-auto z-10"
-            >
-              <World data={sampleArcs} globeConfig={globeConfig} />
-            </motion.div>
-          </div>
-
+    <div className="flex flex-col h-full bg-zinc-950 border border-border/50 rounded-3xl overflow-hidden relative">
+      {/* Top: Text Content */}
+      <div className="flex flex-col items-start text-left pt-8 px-8 md:pt-10 md:px-10 z-20">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-6">
+          <GlobeIcon size={14} /> Edge Delivery Network
         </div>
+
+        <h2 className="text-3xl tracking-tight font-bold mb-5 text-foreground">
+          Always <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">close to your users.</span>
+        </h2>
+
+        <p className="text-muted-foreground text-[15px] leading-relaxed mb-8 max-w-md">
+          Powered by Cloudflare, your web application and all its static assets are immediately cached and served from 300+ global edge locations. Enjoy sub-50ms latency regardless of where your traffic comes from.
+        </p>
+
+
       </div>
-    </section>
+
+      {/* Bottom: Globe */}
+      <div className="relative w-full h-[280px] shrink-0 hidden md:flex items-center justify-center mt-auto overflow-hidden pb-8">
+        {/* Glow behind globe */}
+        <div className="absolute inset-0 bg-white/5 blur-[100px] rounded-full pointer-events-none -z-10" />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          className="w-full h-full max-w-[380px] max-h-[380px] flex items-center justify-center z-10"
+        >
+          <World data={sampleArcs} globeConfig={globeConfig} />
+        </motion.div>
+      </div>
+    </div>
   );
 }

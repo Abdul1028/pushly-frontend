@@ -25,48 +25,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-const features = [
-  {
-    icon: Code,
-    title: "Framework Support",
-    description: "Deploy Create React App, Vite, Astro, and more with zero configuration",
-  },
-  {
-    icon: Package,
-    title: "Package Manager Support",
-    description: "Works seamlessly with npm, pnpm, and yarn. Your choice, our platform.",
-  },
-  {
-    icon: Terminal,
-    title: "Real-time Logs",
-    description: "Monitor your deployments with live streaming logs and instant updates",
-  },
-  {
-    icon: GitBranch,
-    title: "Git Integration",
-    description: "Connect your GitHub repos and deploy automatically on every push",
-  },
-  {
-    icon: Clock,
-    title: "Fast Deployments",
-    description: "Get your webapp live in seconds with our optimized build pipeline",
-  },
-  {
-    icon: Shield,
-    title: "Secure by Default",
-    description: "Enterprise-grade security with SSL certificates and secure connections",
-  },
-  {
-    icon: Globe,
-    title: "Global CDN",
-    description: "Serve your content from edge locations worldwide for lightning-fast performance",
-  },
-  {
-    icon: Activity,
-    title: "Performance Monitoring",
-    description: "Track metrics, uptime, and performance analytics in real-time",
-  },
-];
+
 
 const frameworks = [
   { name: "Create React App", color: "bg-blue-500/10 text-blue-500" },
@@ -160,42 +119,18 @@ export default function Home() {
       {/* Custom gitway.config.json Section */}
       <CustomConfigSection />
 
-      {/* Global Edge / Cloudflare Section */}
-      {/* <GlobalEdgeSection /> */}
-
-
-
-      {/* Features Grid */}
-      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
-        <div className="text-center mb-12 max-w-3xl mx-auto">
-          <h2 className="text-3xl font-bold tracking-tight mb-4">
-            Everything You Need to Deploy
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto px-4">
-            Powerful features to get your webapp live, monitor performance, and scale effortlessly
-          </p>
-        </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
-          {features.map((feature) => {
-            const Icon = feature.icon;
-            return (
-              <Card key={feature.title} className="transition-all hover:shadow-lg hover:border-primary/50">
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <CardTitle className="text-lg">{feature.title}</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription>{feature.description}</CardDescription>
-                </CardContent>
-              </Card>
-            );
-          })}
+      {/* Infrastructure Features: CDN & SSL */}
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-24 w-full max-w-7xl">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start h-full">
+          <GlobalEdgeSection />
+          <SslSecuritySection />
         </div>
       </section>
+
+
+
+
+
 
       {/* Real-time Logs Feature */}
       <section>
@@ -263,11 +198,7 @@ export default function Home() {
         </Card>
       </section>
 
-      <SslSecuritySection />
 
-      <section>
-        <GlobalEdgeSection />
-      </section>
 
 
     </div>
