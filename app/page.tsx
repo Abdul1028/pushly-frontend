@@ -1,15 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRODUCT_NAME } from "@/lib/config";
 import { SystemStatus } from "@/components/system-status";
+import { DeployPipelineAnimation } from "@/components/deploy-pipeline-animation";
+import { FrameworksAutoDetect } from "@/components/frameworks-auto-detect";
+import { CustomConfigSection } from "@/components/custom-config-section";
 import {
-  Rocket,
-  Zap,
   Code,
   Terminal,
   Package,
@@ -88,87 +88,74 @@ export default function Home() {
         <SystemStatus />
       </div>
 
-      {/* Hero Section */}
-      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 w-full max-w-7xl">
-        <div className="flex flex-col items-center justify-center text-center space-y-6 mx-auto w-full">
-          <Badge variant="secondary" className="mb-4">
-            <Rocket className="h-3 w-3 mr-1" />
-            Make Your Webapp Live
-          </Badge>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-6xl lg:text-7xl max-w-4xl mx-auto">
-            Deploy Your Projects
-            <br />
-            <span className="text-primary">In Seconds</span>
-          </h1>
-          <p className="max-w-2xl mx-auto text-xl text-muted-foreground px-4">
-            {PRODUCT_NAME} supports your favorite frameworks and package managers. 
-            Get real-time logs, instant deployments, and make your webapp live with us.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 pt-4 items-center justify-center">
-            <Button size="lg" onClick={() => router.push("/register")} className="text-lg px-8 w-full sm:w-auto">
-              Get Started
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => router.push("/login")}
-              className="text-lg px-8 w-full sm:w-auto"
-            >
-              Sign In
-            </Button>
+      {/* ── Hero Section — Immersive Animated (Stitch Design) ── */}
+      <section className="relative overflow-hidden bg-background py-6 lg:py-8 flex items-center">
+
+        <div className=" mx-auto px-4 sm:px-8 lg:px-10 w-full max-w-7xl relative z-10">
+          <div className="grid lg:grid-cols-2 gap-8 items-center">
+
+            {/* Left: Text content */}
+            <div className="flex flex-col">
+              {/* Animated badge */}
+              <div className="inline-flex self-start items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-[10px] font-bold tracking-widest uppercase text-primary mb-4">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                </span>
+                Now Supporting Next.js 14
+              </div>
+
+              {/* Headline */}
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.1] mb-3 text-foreground">
+                Push code. <br />
+                <span className="neon-text-gradient">Get a live URL in seconds.</span>
+              </h1>
+
+              {/* Subtext */}
+              <p className="text-sm text-muted-foreground max-w-lg leading-relaxed mb-5">
+                From Git push to global deployment — instantly. Our high-performance
+                edge network ensures your applications are delivered with zero
+                latency and infinite scalability.
+              </p>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => router.push("/register")}
+                  className="px-6 py-3 bg-primary text-primary-foreground rounded-xl font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_20px_hsl(var(--primary)/0.3)] group"
+                >
+                  Start Deploying
+                  <svg className="group-hover:translate-x-1 transition-transform" fill="none" height={20} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24" width={20}>
+                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => router.push("/login")}
+                  className="px-6 py-3 bg-card border border-border rounded-xl font-semibold text-sm flex items-center gap-2 hover:bg-accent transition-all text-foreground"
+                >
+                  Sign In
+                  <svg fill="none" height={20} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24" width={20}>
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                    <polyline points="10 17 15 12 10 7" />
+                    <line x1={15} x2={3} y1={12} y2={12} />
+                  </svg>
+                </button>
+              </div>
+
+            </div>
+
+            {/* Right: Animated Deploy Pipeline */}
+            <DeployPipelineAnimation />
+
           </div>
         </div>
       </section>
 
-      {/* Frameworks & Package Managers */}
-      <section className="border-t bg-muted/50">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
-          <div className="grid gap-8 md:grid-cols-2 max-w-5xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Code className="h-5 w-5" />
-                  Supported Frameworks
-                </CardTitle>
-                <CardDescription>
-                  Deploy your favorite frameworks with zero configuration
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {frameworks.map((framework) => (
-                    <Badge key={framework.name} variant="outline" className={framework.color}>
-                      {framework.name}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Package Managers
-                </CardTitle>
-                <CardDescription>
-                  Use your preferred package manager, we support them all
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-4">
-                  {packageManagers.map((pm) => (
-                    <div key={pm.name} className="flex items-center gap-2">
-                      <span className="text-2xl">{pm.icon}</span>
-                      <span className="font-medium">{pm.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
+      {/* Frameworks Auto Detect UI */}
+      <FrameworksAutoDetect />
+
+      {/* Custom gitway.config.json Section */}
+      <CustomConfigSection />
 
       {/* Features Grid */}
       <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
@@ -203,7 +190,7 @@ export default function Home() {
       </section>
 
       {/* Real-time Logs Feature */}
-      <section className="border-t bg-muted/50">
+      <section>
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
           <Card className="max-w-4xl mx-auto">
             <CardHeader>
