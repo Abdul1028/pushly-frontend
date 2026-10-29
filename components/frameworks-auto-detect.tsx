@@ -1,8 +1,11 @@
 "use client";
 
 import { motion, AnimatePresence } from "motion/react";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useEffect, useState, useRef } from "react";
 import { Terminal } from "lucide-react";
+import { WindowBar } from "@/components/ui/window-bar";
+import { PRODUCT_NAME } from "@/lib/config";
 
 // Beautiful inline SVGs for the frameworks
 const Icons: Record<string, any> = {
@@ -39,10 +42,26 @@ const FRAMEWORKS = [
   { id: "qwik", name: "Qwik", color: "#18b6f6", cmd: "npm run build" },
 ];
 
+type DetectLog = { text: string, type: 'info' | 'success' | 'cmd', special?: boolean };
+
+function detectionLogs(index: number): DetectLog[] {
+  return [
+    { text: "Analyzing repository structure...", type: 'info' },
+    { text: "Scanning for package.json...", type: 'info' },
+    { text: `Found configuration for ${FRAMEWORKS[index].name}.`, type: 'info' },
+    { text: `Detected ${FRAMEWORKS[index].name} deployment.`, type: 'success', special: true },
+    { text: `Assigning optimal build command`, type: 'info' },
+    { text: FRAMEWORKS[index].cmd, type: 'cmd' },
+  ];
+}
+
 export function FrameworksAutoDetect() {
+  const reduceMotion = usePrefersReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
-  const [logs, setLogs] = useState<{ text: string, type: 'info' | 'success' | 'cmd', special?: boolean }[]>([]);
+  const [streamedLogs, setLogs] = useState<DetectLog[]>([]);
+  // Reduced motion: no typing, no auto-cycling — show the finished result for the picked framework
+  const logs = reduceMotion ? detectionLogs(activeIndex) : streamedLogs;
   const timeoutRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   
   // Spotlight effect
@@ -68,17 +87,16 @@ export function FrameworksAutoDetect() {
     clearTimers();
     setActiveIndex(index);
     setLogs([]);
+    if (reduceMotion) return;
+    const steps = detectionLogs(index);
     
-    timeoutRef.current.push(setTimeout(() => setLogs([{ text: "Analyzing repository structure...", type: 'info' }]), 150));
-    timeoutRef.current.push(setTimeout(() => setLogs(p => [...p, { text: "Scanning for package.json...", type: 'info' }]), 550));
-    timeoutRef.current.push(setTimeout(() => setLogs(p => [...p, { text: `Found configuration for ${FRAMEWORKS[index].name}.`, type: 'info' }]), 1000));
-    timeoutRef.current.push(setTimeout(() => setLogs(p => [...p, { text: `Detected ${FRAMEWORKS[index].name} deployment.`, type: 'success', special: true }]), 1600));
-    timeoutRef.current.push(setTimeout(() => setLogs(p => [...p, { text: `Assigning optimal build command`, type: 'info' }]), 2200));
-    timeoutRef.current.push(setTimeout(() => setLogs(p => [...p, { text: FRAMEWORKS[index].cmd, type: 'cmd' }]), 2800));
+    [150, 550, 1000, 1600, 2200, 2800].forEach((delay, i) => {
+      timeoutRef.current.push(setTimeout(() => setLogs(steps.slice(0, i + 1)), delay));
+    });
   };
 
   useEffect(() => {
-    if (!isHovered) {
+    if (!isHovered && !reduceMotion) {
       runDetectionSequence(activeIndex);
       const intervalId = setInterval(() => {
         const nextIndex = (activeIndex + 1) % FRAMEWORKS.length;
@@ -91,52 +109,49 @@ export function FrameworksAutoDetect() {
       };
     }
     return clearTimers;
-  }, [activeIndex, isHovered]);
+  }, [activeIndex, isHovered, reduceMotion]);
 
   const activeFw = FRAMEWORKS[activeIndex];
 
   return (
-    <section className="w-full py-24 relative overflow-hidden border-b border-border/50 bg-[#050505]">
+    <section className="w-full px-4 sm:px-6 py-24 md:py-32 relative overflow-hidden bg-surface/40">
       
       {/* Immersive background glow */}
       <div 
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[140px] opacity-10 pointer-events-none transition-colors duration-1000"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[140px] opacity-[0.06] pointer-events-none transition-colors duration-1000"
         style={{ backgroundColor: activeFw.color }}
       />
       
-      <div className="container mx-auto px-6 max-w-6xl relative z-10">
+      <div className="mx-auto max-w-[980px] relative z-10">
         
-        <div className="text-center mb-16">
-          <h2 className="text-3xl tracking-tight font-bold mb-4 text-foreground">
-            Zero Configuration. <span className="text-muted-foreground">We detect your stack.</span>
+        <div className="text-center mb-14 md:mb-16">
+          <p className="text-eyebrow text-ink-2">Zero configuration</p>
+          <h2 className="text-headline mt-2">
+            We detect your stack.
+            <br />
+            <span className="text-ink-2">You just push.</span>
           </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto text-sm">
-            Pushly automatically analyzes your repository, detects your framework natively, and configures the exact build mechanics. It just works.
+          <p className="text-lede text-ink-2 max-w-[600px] mx-auto mt-5">
+            {PRODUCT_NAME} reads your repository, recognises the framework, and sets the exact build
+            commands for it. Fourteen frameworks, no setup.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           
           {/* Left: Terminal */}
-          <div className="bg-[#0a0a0a] rounded-2xl border border-white/10 p-5 shadow-2xl h-[320px] flex flex-col relative group overflow-hidden">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-3 h-3 rounded-full bg-red-500/80" />
-              <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-              <div className="w-3 h-3 rounded-full bg-green-500/80" />
-              <span className="ml-auto text-[10px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-2 tracking-widest">
-                <Terminal size={12} /> Auto-Detect CLI
-              </span>
-            </div>
+          <div className="window h-[340px] flex flex-col relative group">
+            <WindowBar title="Auto-detect" icon={<Terminal size={12} />} />
 
-            <div className="flex-1 font-mono text-sm flex flex-col gap-3">
+            <div className="flex-1 p-5 font-mono text-[13px] flex flex-col gap-3">
               <AnimatePresence>
                 {logs.map((log, idx) => {
                    if (log.type === 'cmd') {
                      return (
-                      <motion.div key={idx} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mt-4 p-4 bg-black/50 rounded-xl border border-white/5 relative overflow-hidden group/cmd">
+                      <motion.div key={idx} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mt-4 p-4 bg-black/60 rounded-xl border border-hairline relative overflow-hidden group/cmd">
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/cmd:translate-x-full transition-transform duration-1000" />
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Build Command</div>
-                        <div className="flex justify-between items-center text-blue-400 font-bold">
+                        <div className="font-sans text-xs text-ink-3 mb-1.5">Build command</div>
+                        <div className="flex justify-between items-center text-apple-link font-semibold">
                           <span>$ {log.text}</span>
                         </div>
                       </motion.div>
@@ -145,14 +160,14 @@ export function FrameworksAutoDetect() {
                    if (log.special) {
                      return (
                       <motion.div key={idx} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 text-white">
-                        <span className="text-green-400">✓</span> 
+                        <span className="text-apple-green">✓</span> 
                         Detected <strong style={{ color: activeFw.color }}>{activeFw.name}</strong>
                       </motion.div>
                      )
                    }
                    return (
-                    <motion.div key={idx} initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} className="text-muted-foreground/80 flex gap-2">
-                       <span className="text-primary/70">❯</span> {log.text}
+                    <motion.div key={idx} initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} className="text-ink-2 flex gap-2">
+                       <span className="text-ink-3">❯</span> {log.text}
                     </motion.div>
                    )
                 })}
@@ -161,8 +176,8 @@ export function FrameworksAutoDetect() {
               <AnimatePresence>
                 {logs.length > 0 && logs.length < 6 && (
                   <motion.div 
-                    initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1 }} 
-                    className="w-2 h-4 bg-muted ml-6"
+                    initial={{ opacity: 0 }} animate={reduceMotion ? undefined : { opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1 }} 
+                    className="w-2 h-4 bg-ink-3 ml-6"
                   />
                 )}
               </AnimatePresence>
@@ -198,7 +213,7 @@ export function FrameworksAutoDetect() {
                      }
                      setIsHovered(true);
                   }}
-                  className="aspect-square relative rounded-xl border border-white/5 bg-white/[0.015] flex flex-col items-center justify-center transition-all duration-500 overflow-hidden cursor-crosshair group/card z-10"
+                  className="aspect-square relative rounded-2xl border border-white/5 bg-white/[0.02] flex flex-col items-center justify-center transition-all duration-500 overflow-hidden cursor-pointer group/card z-10"
                   style={{
                     borderColor: isActive ? fw.color : "rgba(255,255,255,0.05)",
                     backgroundColor: isActive ? `${fw.color}15` : "rgba(255,255,255,0.015)",
@@ -221,13 +236,13 @@ export function FrameworksAutoDetect() {
                     {Icon ? <Icon /> : <span className="font-bold">{fw.name[0]}</span>}
                   </div>
 
-                  <span className="text-[8px] md:text-[9px] font-mono opacity-80 uppercase tracking-widest text-center px-1 z-10 transition-colors"
+                  <span className="text-[10px] md:text-[11px] font-medium text-center px-1 z-10 transition-colors"
                     style={{ color: isActive ? "#ffffff" : "rgba(255,255,255,0.3)" }}>
                     {fw.name}
                   </span>
                   
                   {/* Subtle hover inset border */}
-                  <div className="absolute inset-0 border border-white/0 group-hover/card:border-white/10 rounded-xl transition-colors pointer-events-none" />
+                  <div className="absolute inset-0 border border-white/0 group-hover/card:border-white/10 rounded-2xl transition-colors pointer-events-none" />
                 </div>
               );
             })}

@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Terminal, Activity } from "lucide-react";
+import { Terminal } from "lucide-react";
+import { WindowBar } from "@/components/ui/window-bar";
+import { PRODUCT_NAME } from "@/lib/config";
 import { motion, AnimatePresence } from "motion/react";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const RAW_LOGS = [
   "[1] [3/27/2026, 12:05:05 PM] Build Started... (ENV: PRODUCTION)",
@@ -44,7 +47,7 @@ const RAW_LOGS = [
   "",
   "[37] [3/27/2026, 12:05:14 PM] ✨ Perfect! Production build completed in 7.2s.",
   "[38] [3/27/2026, 12:05:15 PM] 🚀 Webapp seamlessly deployed to global edge network.",
-  "[39] [3/27/2026, 12:05:15 PM] View it at https://project.gitway.app"
+  "[39] [3/27/2026, 12:05:15 PM] View it at https://project.pushly.app"
 ];
 
 const renderLogLine = (line: string) => {
@@ -56,7 +59,7 @@ const renderLogLine = (line: string) => {
     const content = match[2];
 
     // Highlighting rules to make it look totally authentic
-    let contentEl: React.ReactNode = <span className="text-zinc-300">{content}</span>;
+    let contentEl: React.ReactNode = <span className="text-ink/85">{content}</span>;
 
     if (content.includes("View it at")) {
       const urlMatch = content.match(/(https?:\/\/[^\s]+)/);
@@ -64,9 +67,9 @@ const renderLogLine = (line: string) => {
         const url = urlMatch[1];
         const parts = content.split(url);
         contentEl = (
-          <span className="text-emerald-400 font-medium">
+          <span className="text-apple-green font-medium">
             {parts[0]}
-            <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline underline-offset-4 hover:text-white transition-colors relative z-20">
+            <a href={url} target="_blank" rel="noopener noreferrer" className="text-apple-link underline underline-offset-4 hover:text-white transition-colors relative z-20">
               {url}
             </a>
             {parts[1]}
@@ -74,32 +77,36 @@ const renderLogLine = (line: string) => {
         );
       }
     } else if (content.includes("✅") || content.includes("done") || content.includes("✨") || content.includes("🚀")) {
-      contentEl = <span className="text-emerald-400 font-medium">{content}</span>;
+      contentEl = <span className="text-apple-green font-medium">{content}</span>;
     } else if (content.includes("Progress:") || content.includes("Framework:") || content.includes("Build Command:")) {
-      contentEl = <span className="text-cyan-400">{content}</span>;
+      contentEl = <span className="text-ink-2">{content}</span>;
     } else if (content.includes("Update available!") || content.includes("│") || content.includes("╭") || content.includes("╰")) {
-      contentEl = <span className="text-yellow-400">{content}</span>;
+      contentEl = <span className="text-apple-orange">{content}</span>;
     } else if (content.includes("🔨") || content.includes("📥") || content.includes("Install Command:")) {
-      contentEl = <span className="text-blue-400">{content}</span>;
+      contentEl = <span className="text-apple-link">{content}</span>;
     }
 
     return (
-      <div className="font-mono text-[13px] leading-snug break-all hover:bg-white/5 px-2 py-0.5 rounded transition-colors group cursor-crosshair">
-        <span className="text-zinc-600 mr-3 truncate shrink-0 inline-block group-hover:text-zinc-400 transition-colors w-[260px] md:w-auto">
+      <div className="font-mono text-[13px] leading-snug break-all hover:bg-white/5 px-2 py-0.5 rounded transition-colors group cursor-default">
+        <span className="text-ink-3 mr-3 truncate shrink-0 inline-block group-hover:text-ink-2 transition-colors w-[260px] md:w-auto">
           {timestamp}
         </span>
         {contentEl}
       </div>
     );
   }
-  return <div className="font-mono text-[13px] text-zinc-300 px-2 py-0.5">{line}</div>;
+  return <div className="font-mono text-[13px] text-ink/85 px-2 py-0.5">{line}</div>;
 };
 
 export function RealTimeLogsSection() {
-  const [visibleLines, setVisibleLines] = useState<string[]>([]);
+  const reduceMotion = usePrefersReducedMotion();
+  const [streamedLines, setStreamedLines] = useState<string[]>([]);
+  // Reduced motion: show the whole log instead of streaming it on a loop
+  const visibleLines = reduceMotion ? RAW_LOGS : streamedLines;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (reduceMotion) return;
     let i = 0;
     let timeoutId: NodeJS.Timeout;
     let isSubscribed = true;
@@ -108,7 +115,7 @@ export function RealTimeLogsSection() {
       if (!isSubscribed) return;
 
       if (i < RAW_LOGS.length) {
-        setVisibleLines(prev => [...prev, RAW_LOGS[i]]);
+        setStreamedLines(prev => [...prev, RAW_LOGS[i]]);
         i++;
 
         // Dynamic typing speed: fast for info, slow for dependencies
@@ -128,7 +135,7 @@ export function RealTimeLogsSection() {
         // Wait 8 seconds before restarting loop
         timeoutId = setTimeout(() => {
           if (!isSubscribed) return;
-          setVisibleLines([]);
+          setStreamedLines([]);
           i = 0;
           streamLogs();
         }, 8000);
@@ -141,7 +148,7 @@ export function RealTimeLogsSection() {
       isSubscribed = false;
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [reduceMotion]);
 
   // Auto-scroll to bottom of logs
   useEffect(() => {
@@ -151,20 +158,19 @@ export function RealTimeLogsSection() {
   }, [visibleLines]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center bg-zinc-950 border border-border/50 rounded-3xl p-6 md:p-10 lg:p-12 overflow-hidden relative">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(0,180,255,0.03),transparent_70%)] pointer-events-none" />
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative">
 
       {/* Left Text */}
       <div className="lg:col-span-5 flex flex-col z-10">
-        <div className="inline-flex items-center w-fit gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold mb-6">
-          <Activity size={14} /> Total Transparency
-        </div>
+        <p className="text-eyebrow text-ink-2">Real-time logs</p>
 
-        <h2 className="text-3xl md:text-4xl tracking-tight font-bold mb-6 text-foreground">
-          Real-time <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">streaming logs.</span>
+        <h2 className="text-section mt-2">
+          Watch every build.
+          <br />
+          <span className="text-ink-2">As it happens.</span>
         </h2>
 
-        <p className="text-muted-foreground text-[16px] leading-relaxed mb-8 max-w-lg">
+        <p className="text-[17px] leading-[1.47] text-ink-2 mt-5 mb-7 max-w-lg">
           No black boxes here. Watch your deployments execute live as we stream the terminal directly to your dashboard. Understand exactly what your container is doing, exactly as it happens.
         </p>
 
@@ -174,8 +180,8 @@ export function RealTimeLogsSection() {
             "Auto-formatted ansi-colors with smart parsing",
             "Detailed timestamping and operation tracking",
           ].map((feature, idx) => (
-            <li key={idx} className="flex items-center gap-3 text-sm text-foreground/80">
-              <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+            <li key={idx} className="flex items-center gap-3 text-[15px] text-ink-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-ink-3" />
               {feature}
             </li>
           ))}
@@ -184,19 +190,8 @@ export function RealTimeLogsSection() {
 
       {/* Right Log Window */}
       <div className="lg:col-span-7 z-10 w-full h-[400px] md:h-[500px]">
-        <div className="bg-[#0c0c0e] border border-white/10 rounded-xl overflow-hidden shadow-2xl shadow-blue-900/10 flex flex-col h-full w-full">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#18181b]">
-            <div className="flex items-center gap-2">
-              <Terminal size={14} className="text-zinc-500" />
-              <span className="text-xs font-medium text-zinc-400">Gitway Project Logs</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
-              <span className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
-            </div>
-          </div>
+        <div className="window flex flex-col h-full w-full">
+          <WindowBar title={`${PRODUCT_NAME} — build logs`} icon={<Terminal size={12} />} />
 
           {/* Log Stream Body */}
           <div
@@ -220,7 +215,7 @@ export function RealTimeLogsSection() {
                 <motion.div
                   animate={{ opacity: [1, 0] }}
                   transition={{ repeat: Infinity, duration: 0.8 }}
-                  className="w-2 h-4 bg-zinc-500 mt-1 ml-2 inline-block"
+                  className="w-2 h-4 bg-ink-3 mt-1 ml-2 inline-block"
                 />
               )}
             </AnimatePresence>

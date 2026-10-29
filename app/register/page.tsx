@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { MotionConfig, motion } from "motion/react";
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -34,6 +35,14 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center p-8">
+      {/* Rises in as the "Get started" cover lifts — part of that transition, so it plays with reduced motion too */}
+      <MotionConfig reducedMotion="never">
+      <motion.div
+        className="w-full max-w-md"
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", bounce: 0, duration: 0.8, delay: 0.15 }}
+      >
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Create your account</CardTitle>
@@ -110,6 +119,8 @@ export default function RegisterPage() {
           </CardFooter>
         </form>
       </Card>
+      </motion.div>
+      </MotionConfig>
     </div>
   );
 }

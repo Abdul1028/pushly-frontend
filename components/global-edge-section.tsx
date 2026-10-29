@@ -3,7 +3,7 @@
 import React from "react";
 import dynamic from "next/dynamic";
 import { motion } from "motion/react";
-import { Globe as GlobeIcon, Zap, Server, ShieldCheck } from "lucide-react";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 const World = dynamic(() => import("@/components/ui/globe").then((m) => m.World), {
   ssr: false,
@@ -374,6 +374,7 @@ const sampleArcs = [
 ];
 
 export function GlobalEdgeSection() {
+  const reduceMotion = usePrefersReducedMotion();
   const globeConfig = {
     pointSize: 4,
     globeColor: "#000000",
@@ -393,23 +394,21 @@ export function GlobalEdgeSection() {
     rings: 1,
     maxRings: 3,
     initialPosition: { lat: 22.3193, lng: 114.1694 },
-    autoRotate: true,
+    autoRotate: !reduceMotion,
     autoRotateSpeed: 0.5,
   };
 
   return (
-    <div className="flex flex-col md:flex-row xl:flex-col h-full bg-zinc-950 border border-border/50 rounded-3xl overflow-hidden relative">
+    <div className="flex flex-col md:flex-row lg:flex-col h-full bg-surface border border-hairline rounded-[28px] overflow-hidden relative">
       {/* Text Content */}
-      <div className="flex flex-col items-start text-left pt-8 px-8 md:p-10 xl:pt-8 xl:px-8 z-20 md:w-1/2 xl:w-full justify-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-6">
-          <GlobeIcon size={14} /> Edge Delivery Network
-        </div>
+      <div className="flex flex-col items-start text-left pt-9 px-8 md:p-10 lg:pt-9 lg:px-9 lg:pb-0 z-20 md:w-1/2 lg:w-full justify-center">
+        <p className="text-[15px] font-semibold text-ink-2">Edge network</p>
 
-        <h2 className="text-3xl tracking-tight font-bold mb-5 text-foreground">
-          Always <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">close to your users.</span>
-        </h2>
+        <h3 className="text-title mt-1.5 mb-3 text-ink">
+          Always close to your users.
+        </h3>
 
-        <p className="text-muted-foreground text-[15px] leading-relaxed mb-8 max-w-md">
+        <p className="text-ink-2 text-[17px] leading-[1.47] max-w-md">
           Powered by Cloudflare, your web application and all its static assets are immediately cached and served from 300+ global edge locations. Enjoy sub-50ms latency regardless of where your traffic comes from.
         </p>
 
@@ -417,15 +416,14 @@ export function GlobalEdgeSection() {
       </div>
 
       {/* Globe */}
-      <div className="relative w-full h-[280px] shrink-0 md:h-auto xl:h-[280px] md:w-1/2 xl:w-full hidden md:flex items-center justify-center mt-auto md:mt-0 xl:mt-auto overflow-hidden pb-8 md:pb-0 xl:pb-8">
+      <div className="relative w-full h-[300px] shrink-0 md:h-auto lg:h-[300px] md:w-1/2 lg:w-full hidden md:flex items-center justify-center mt-auto md:mt-0 lg:mt-auto overflow-hidden pb-6 md:pb-0 lg:pb-6">
         {/* Glow behind globe */}
-        <div className="absolute inset-0 bg-white/5 blur-[100px] rounded-full pointer-events-none -z-10" />
 
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 1, ease: "easeOut" }}
+          transition={{ type: "spring", bounce: 0, duration: 1 }}
           className="w-full h-full max-w-[380px] max-h-[380px] flex items-center justify-center z-10"
         >
           <World data={sampleArcs} globeConfig={globeConfig} />

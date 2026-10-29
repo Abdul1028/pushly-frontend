@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect } from "react";
+import useSWR from "swr";
 import { cn } from "@/lib/utils";
 import { STATUS_PAGE_URL } from "@/lib/config";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 
 interface HealthService {
   name: string;
@@ -23,141 +23,108 @@ interface CachedStatus {
 
 const CACHE_KEY = "pushly_system_status";
 const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
+const HEALTH_URL = "https://actuator-service-70a533dbaa96.herokuapp.com/api/status/health";
 
-export function SystemStatus() {
-  const [status, setStatus] = useState<HealthResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// Load cached status from localStorage
+const loadCachedStatus = (): HealthResponse | null => {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (!cached) return null;
 
-  // Load cached status from localStorage
-  const loadCachedStatus = (): HealthResponse | null => {
-    if (typeof window === "undefined") return null;
+    const { data, timestamp }: CachedStatus = JSON.parse(cached);
 
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (!cached) return null;
-
-      const { data, timestamp }: CachedStatus = JSON.parse(cached);
-      const age = Date.now() - timestamp;
-
-      // Ignore cache older than 5 minutes
-      if (age > CACHE_MAX_AGE) {
-        localStorage.removeItem(CACHE_KEY);
-        return null;
-      }
-
-      return data;
-    } catch (err) {
-      console.error("Error loading cached status:", err);
+    // Ignore cache older than 5 minutes
+    if (Date.now() - timestamp > CACHE_MAX_AGE) {
+      localStorage.removeItem(CACHE_KEY);
       return null;
     }
-  };
 
-  // Save status to localStorage
-  const saveStatusToCache = (data: HealthResponse) => {
-    if (typeof window === "undefined") return;
+    return data;
+  } catch (err) {
+    console.error("Error loading cached status:", err);
+    return null;
+  }
+};
 
-    try {
-      const cached: CachedStatus = {
-        data,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cached));
-    } catch (err) {
-      console.error("Error saving status to cache:", err);
-    }
-  };
+// Save status to localStorage
+const saveStatusToCache = (data: HealthResponse) => {
+  try {
+    const cached: CachedStatus = { data, timestamp: Date.now() };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cached));
+  } catch (err) {
+    console.error("Error saving status to cache:", err);
+  }
+};
 
-  const fetchStatus = async () => {
-    try {
-      const response = await fetch(
-        "https://actuator-service-70a533dbaa96.herokuapp.com/api/status/health",
-        {
-          cache: "no-store",
-        }
-      );
+const fetchStatus = async (url: string): Promise<HealthResponse> => {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Failed to fetch status");
+  }
+  return response.json();
+};
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch status");
-      }
+export function SystemStatus() {
+  // Stale-while-revalidate: show the last known status, refetch in the background
+  // every 30s, when the tab regains focus, and when the network comes back.
+  const { data: status, error, isLoading, mutate } = useSWR(HEALTH_URL, fetchStatus, {
+    refreshInterval: 30000,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    onSuccess: saveStatusToCache,
+  });
 
-      const data: HealthResponse = await response.json();
-
-      // Update state
-      setStatus(data);
-      setError(null);
-
-      // Save to cache for next time
-      saveStatusToCache(data);
-    } catch (err) {
-      setError("Failed to fetch status");
-      console.error("Error fetching system status:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Seed from localStorage after mount (reading it during render would break hydration)
   useEffect(() => {
-    // 1. Try to load from cache first (instant display)
     const cached = loadCachedStatus();
-    if (cached) {
-      setStatus(cached);
-      setLoading(false); // Show cached data immediately
-    }
+    if (cached) mutate((current) => current ?? cached, { revalidate: false });
+  }, [mutate]);
 
-    // 2. Fetch fresh data in background (updates when ready)
-    fetchStatus();
+  const loading = isLoading && !status;
+  const showSkeleton = useDelayedFlag(loading);
 
-    // 3. Continue refreshing every 30 seconds
-    const interval = setInterval(fetchStatus, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleClick = () => {
-    window.open(STATUS_PAGE_URL, "_blank", "noopener,noreferrer");
-  };
+  // Footer link is ~16px tall; the ::after extends the tap area to 44px without changing the look
+  const linkClass = cn(
+    "relative inline-flex items-center gap-2 text-[12px] text-label-2",
+    "after:absolute after:-inset-y-3.5 after:-inset-x-2 after:content-['']"
+  );
 
   const isAllUp = status?.overallStatus === "UP";
   const downServices = status?.services.filter((s) => s.status !== "UP") || [];
 
   // Only show skeleton if no cached data
-  if (loading && !status) {
+  if (loading) {
     return (
-      <Card
-        className={cn(
-          "inline-flex items-center gap-2 px-3 py-1.5 rounded-full",
-          "bg-muted/30 backdrop-blur-sm border",
-          "cursor-pointer transition-all hover:opacity-80"
-        )}
-        onClick={handleClick}
-      >
-        <Skeleton className="h-2 w-2 rounded-full" />
-        <span className="text-sm text-muted-foreground">Checking system status…</span>
-      </Card>
+      <div className={linkClass} role="status">
+        {/* Keeps its loaded size; the gray blocks only appear if loading passes 300ms */}
+        <span className={cn("h-2 w-2 rounded-full bg-fill-2 animate-pulse", !showSkeleton && "invisible")} />
+        <span className={cn("h-3 w-28 rounded bg-fill-2 animate-pulse", !showSkeleton && "invisible")} />
+        <span className="sr-only">Checking system status…</span>
+      </div>
     );
   }
 
   return (
-    <Card
-      className={cn(
-        "inline-flex items-center gap-2 px-3 py-1.5 rounded-full",
-        "bg-muted/30 backdrop-blur-sm border",
-        "cursor-pointer transition-all hover:opacity-80 hover:scale-105"
-      )}
-      onClick={handleClick}
+    <a
+      href={STATUS_PAGE_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(linkClass, "hover:text-label hover:underline underline-offset-2")}
     >
       <div
         className={cn(
           "h-2 w-2 rounded-full transition-colors",
-          isAllUp ? "bg-green-500" : "bg-red-500"
+          !status ? "bg-label-3" : isAllUp ? "bg-sys-green" : "bg-sys-red"
         )}
       />
-      <span className="text-sm text-foreground">
-        {isAllUp
-          ? "All systems normal."
-          : `Some systems down: ${downServices.map((s) => s.name).join(", ")}`}
+      <span>
+        {!status && error
+          ? "Status unavailable"
+          : isAllUp
+            ? "All systems normal."
+            : `Some systems down: ${downServices.map((s) => s.name).join(", ")}`}
       </span>
-    </Card>
+    </a>
   );
 }
 
