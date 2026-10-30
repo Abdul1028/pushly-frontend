@@ -49,11 +49,11 @@ export function Nav() {
   if (status === "loading") {
     // Same bar as the resolved state so the page doesn't jump when auth settles
     const publicPage = pathname === "/" || pathname === "/login" || pathname === "/register"
+      || pathname?.startsWith("/dashboard") || pathname?.startsWith("/project")
     return (
       <nav aria-busy="true" className={cn(
         "sticky top-0 z-50 pt-[env(safe-area-inset-top)]",
-        pathname === "/" ? "material-light border-b border-black/10"
-          : publicPage ? "material-chrome border-b border-hairline" : "border-b bg-background/70 backdrop-blur-xl"
+        publicPage ? "material-light border-b border-black/10" : "border-b bg-background/70 backdrop-blur-xl"
       )}>
         <div className={cn("flex items-center w-full px-4 md:px-6 max-w-[1024px] mx-auto", publicPage ? "h-12" : "h-14")}>
           {showSkeleton && (
@@ -76,8 +76,8 @@ export function Nav() {
       { href: "https://developers.wareality.tech", label: "Docs", external: true },
     ]
 
-    // The landing page is light like apple.com; login/register keep the dark bar
-    const light = pathname === "/"
+    // Public pages (landing, sign in, sign up) are light like apple.com
+    const light = pathname === "/" || pathname === "/login" || pathname === "/register"
     const t = light
       ? {
           // Over the dark chapter (html[data-nav=dark]) the bar turns into dark material
@@ -218,6 +218,39 @@ export function Nav() {
             </>
           )}
         </AnimatePresence>
+        </div>
+      </nav>
+    )
+  }
+
+  // Redesigned app pages (pushly-ui light appearance) get the light bar; the rest keep the old one for now
+  const appLight = pathname?.startsWith("/dashboard") || pathname?.startsWith("/project")
+  if (appLight) {
+    return (
+      <nav className="material-light border-b border-black/10 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
+        <div className="flex h-12 items-center gap-4 sm:gap-6 w-full max-w-[1200px] mx-auto px-4 sm:px-6">
+          <Link href="/dashboard" className="text-[17px] font-semibold tracking-[-0.035em] text-label shrink-0">
+            {PRODUCT_NAME}
+          </Link>
+          <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {navItems.map(item => {
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
+                || (item.href === "/dashboard" && pathname?.startsWith("/project"))
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "inline-flex items-center h-8 px-3 rounded-full text-[13px] whitespace-nowrap transition-colors",
+                    isActive ? "bg-black/[0.06] text-label font-medium" : "text-label-2 hover:text-label"
+                  )}
+                >
+                  {item.label === "Dashboard" ? "Projects" : item.label}
+                </Link>
+              )
+            })}
+          </div>
         </div>
       </nav>
     )

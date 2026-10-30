@@ -2,16 +2,18 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAnimate } from "motion/react";
+import { ChevronRight } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MotionConfig, motion } from "motion/react";
+import { PRODUCT_NAME } from "@/lib/config";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { AuthShell, Field, FormError, PasswordField, SubmitButton } from "@/components/auth/auth-shell";
 
 export default function RegisterPage() {
   const { register } = useAuth();
   const router = useRouter();
+  const reduce = usePrefersReducedMotion();
+  const [panel, animate] = useAnimate<HTMLFormElement>();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -26,103 +28,76 @@ export default function RegisterPage() {
     try {
       await register({ firstName, lastName, email, password });
       router.replace("/dashboard");
-    } catch (err: any) {
-      setError(err?.message || "Registration failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : "We couldn’t create your account. Please try again.");
+      if (!reduce && panel.current) animate(panel.current, { x: [0, -10, 9, -6, 4, 0] }, { duration: 0.45, ease: "easeOut" });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center p-8">
-      {/* Rises in as the "Get started" cover lifts — part of that transition, so it plays with reduced motion too */}
-      <MotionConfig reducedMotion="never">
-      <motion.div
-        className="w-full max-w-md"
-        initial={{ opacity: 0, y: 24, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", bounce: 0, duration: 0.8, delay: 0.15 }}
-      >
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Create your account</CardTitle>
-          <CardDescription className="text-center">
-            Enter your information to get started
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={onSubmit}>
-          <CardContent className="space-y-4">
-            {error && (
-              <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
-                {error}
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First name</Label>
-                <Input
-                  id="firstName"
-                  placeholder="John"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
-                <Input
-                  id="lastName"
-                  placeholder="Doe"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating..." : "Create account"}
-            </Button>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <p className="text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link href="/login" className="text-primary hover:underline">
-                Sign in
-              </Link>
-            </p>
-          </CardFooter>
-        </form>
-      </Card>
-      </motion.div>
-      </MotionConfig>
-    </div>
+    // Arrives through the "Get started" liquid transition, so its entrance always plays
+    <AuthShell
+      alwaysAnimate
+      title="Create your account."
+      subtitle={`Connect a repository and go live on ${PRODUCT_NAME} in minutes.`}
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link href="/login" className="inline-flex items-center py-3 text-link hover:underline underline-offset-2">
+            Sign in
+            <ChevronRight className="size-4" aria-hidden />
+          </Link>
+        </>
+      }
+    >
+      <form ref={panel} onSubmit={onSubmit} className="rounded-2xl bg-white border border-black/[0.06] p-6 sm:p-8 space-y-3 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.12)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            label="First name"
+            autoComplete="given-name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            disabled={loading}
+            autoFocus
+          />
+          <Field
+            label="Last name"
+            autoComplete="family-name"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+            disabled={loading}
+          />
+        </div>
+        <Field
+          label="Email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          aria-invalid={!!error}
+          required
+          disabled={loading}
+        />
+        <PasswordField
+          label="Password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          disabled={loading}
+        />
+        <FormError message={error} />
+        <div className="pt-3">
+          <SubmitButton loading={loading} loadingText="Creating account…">
+            Create account
+          </SubmitButton>
+        </div>
+      </form>
+    </AuthShell>
   );
 }
-
-

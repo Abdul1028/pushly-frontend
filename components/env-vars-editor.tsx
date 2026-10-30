@@ -46,7 +46,7 @@ interface EnvVarsEditorProps {
 
 /* ─── Smart-paste parser ─────────────────────────────────────────────────── */
 
-function parseEnvFile(raw: string): EnvVar[] {
+export function parseEnvFile(raw: string): EnvVar[] {
     const results: EnvVar[] = [];
 
     for (const line of raw.split("\n")) {
