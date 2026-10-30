@@ -20,8 +20,8 @@ import { FooterReveal } from "@/components/landing/footer-reveal";
 
 export default function Home() {
   return (
-    // `landing` switches the document to Apple's light appearance (see globals.css)
-    <div className="landing bg-white text-label">
+    // `appearance-light` switches the document to Apple's light appearance (see globals.css)
+    <div className="appearance-light bg-white text-label">
       <Hero />
 
       <ScrollText text={`${PRODUCT_NAME} takes the repository you already have and turns every push into a live, global, secure deployment. No servers to manage. No pipelines to babysit. Just push.`} />

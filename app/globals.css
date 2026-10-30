@@ -138,14 +138,14 @@
     background-color: #000000 !important;
   }
 
-  /* The landing page is a light page, like apple.com; keep overscroll and scrollbars light too */
-  html:has(.landing),
-  html:has(.landing) body {
+  /* Light pages (landing, sign in, sign up), like apple.com: keep overscroll and scrollbars light too */
+  html:has(.appearance-light),
+  html:has(.appearance-light) body {
     background-color: #ffffff !important;
     color-scheme: light;
   }
 
-  html:has(.landing) {
+  html:has(.appearance-light) {
     scroll-behavior: smooth;
     scroll-padding-top: 3rem;
   }

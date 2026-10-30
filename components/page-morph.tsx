@@ -44,7 +44,8 @@ export function PageMorphProvider({ children }: { children: React.ReactNode }) {
   const [timedOut, setTimedOut] = useState(false);
 
   const start = useCallback(
-    (href: string, el: HTMLElement, to = "#000000") => {
+    // Default flood colour = the light fill behind the sign-up page
+    (href: string, el: HTMLElement, to = "#f5f5f7") => {
       const r = el.getBoundingClientRect();
       setPushedHref(null);
       setTimedOut(false);

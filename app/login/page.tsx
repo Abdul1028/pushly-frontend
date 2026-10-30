@@ -2,16 +2,18 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAnimate } from "motion/react";
+import { ChevronRight } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { PRODUCT_NAME } from "@/lib/config";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { AuthShell, Field, FormError, PasswordField, SubmitButton } from "@/components/auth/auth-shell";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
+  const reduce = usePrefersReducedMotion();
+  const [panel, animate] = useAnimate<HTMLFormElement>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,69 +26,58 @@ export default function LoginPage() {
     try {
       await login(email, password);
       router.replace("/dashboard");
-    } catch (err: any) {
-      setError(err?.message || "Login failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : "Sign in failed. Check your email and password.");
+      // A short shake, like a wrong macOS password; skipped with reduced motion (the message says it)
+      if (!reduce && panel.current) animate(panel.current, { x: [0, -10, 9, -6, 4, 0] }, { duration: 0.45, ease: "easeOut" });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center p-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Sign in to {PRODUCT_NAME}</CardTitle>
-          <CardDescription className="text-center">
-            Enter your credentials to access your account
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={onSubmit}>
-          <CardContent className="space-y-4">
-            {error && (
-              <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
-                {error}
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <p className="text-sm text-muted-foreground">
-              Don't have an account?{" "}
-              <Link href="/register" className="text-primary hover:underline">
-                Register
-              </Link>
-            </p>
-          </CardFooter>
-        </form>
-      </Card>
-    </div>
+    <AuthShell
+      title={`Sign in to ${PRODUCT_NAME}.`}
+      subtitle="Pick up where your last deploy left off."
+      footer={
+        <>
+          New to {PRODUCT_NAME}?{" "}
+          <Link href="/register" className="inline-flex items-center py-3 text-link hover:underline underline-offset-2">
+            Create an account
+            <ChevronRight className="size-4" aria-hidden />
+          </Link>
+        </>
+      }
+    >
+      <form ref={panel} onSubmit={onSubmit} className="rounded-2xl bg-white border border-black/[0.06] p-6 sm:p-8 space-y-3 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.12)]">
+        <Field
+          label="Email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          aria-invalid={!!error}
+          required
+          disabled={loading}
+          autoFocus
+        />
+        <PasswordField
+          label="Password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          aria-invalid={!!error}
+          required
+          disabled={loading}
+        />
+        <FormError message={error} />
+        <div className="pt-3">
+          <SubmitButton loading={loading} loadingText="Signing in…">
+            Sign in
+          </SubmitButton>
+        </div>
+      </form>
+    </AuthShell>
   );
 }
-
-
