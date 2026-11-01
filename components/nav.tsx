@@ -49,7 +49,7 @@ export function Nav() {
   if (status === "loading") {
     // Same bar as the resolved state so the page doesn't jump when auth settles
     const publicPage = pathname === "/" || pathname === "/login" || pathname === "/register"
-      || pathname?.startsWith("/dashboard") || pathname?.startsWith("/project")
+      || pathname?.startsWith("/dashboard") || pathname?.startsWith("/project") || pathname === "/new" || pathname === "/settings"
     return (
       <nav aria-busy="true" className={cn(
         "sticky top-0 z-50 pt-[env(safe-area-inset-top)]",
@@ -224,7 +224,7 @@ export function Nav() {
   }
 
   // Redesigned app pages (pushly-ui light appearance) get the light bar; the rest keep the old one for now
-  const appLight = pathname?.startsWith("/dashboard") || pathname?.startsWith("/project")
+  const appLight = pathname?.startsWith("/dashboard") || pathname?.startsWith("/project") || pathname === "/new" || pathname === "/settings"
   if (appLight) {
     return (
       <nav className="material-light border-b border-black/10 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">

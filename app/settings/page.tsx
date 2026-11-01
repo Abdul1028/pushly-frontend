@@ -4,13 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { API_BASE_URL } from "@/lib/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import {
   User,
@@ -20,20 +13,38 @@ import {
   Bell,
   Loader2,
   Check,
-  UserCircle,
-  Settings as SettingsIcon,
-  Github,
-  Link as LinkIcon,
-  Unlink,
+  AlertTriangle,
 } from "lucide-react";
 import { PRODUCT_NAME } from "@/lib/config";
 import { GitHubConnectionCard } from "@/components/github-connection-card";
+import { PageHeader, Panel, TextField, btn } from "@/components/project/ui";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { AnimatePresence, motion } from "motion/react";
+import { cn } from "@/lib/utils";
+
+type TabKey = "profile" | "account" | "notifications";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { user, token, status, logout } = useAuth();
   const { toast } = useToast();
+  const reduce = usePrefersReducedMotion();
+
+  const [activeTab, setActiveTab] = useState<TabKey>("profile");
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // Profile edit states
+  const [firstName, setFirstName] = useState(user?.firstName || "");
+  const [lastName, setLastName] = useState(user?.lastName || "");
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Sync state if user loads late
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || "");
+      setLastName(user.lastName || "");
+    }
+  }, [user]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -42,48 +53,38 @@ export default function SettingsPage() {
     }
   }, [status, router]);
 
-  // Profile edit states
-  const [firstName, setFirstName] = useState(user?.firstName || "");
-  const [lastName, setLastName] = useState(user?.lastName || "");
-  const [savingProfile, setSavingProfile] = useState(false);
-
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      // Call the backend logout endpoint if token exists
       if (token) {
         try {
-          // Use direct fetch since logout endpoint returns plain text, not JSON
           await fetch(`${API_BASE_URL}/api/auth/logout`, {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${token}`,
+              Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
           });
-          // Don't parse response as JSON - logout endpoint returns plain text
         } catch (error) {
-          // Continue with local logout even if backend fails
           console.error("Backend logout failed:", error);
         }
       }
 
-      // Clear local auth state
       await logout();
 
       toast({
-        title: "Logged out successfully",
-        description: "You have been logged out of your account.",
+        title: "Signed out",
+        description: "You have been signed out of your account.",
       });
 
-      // Redirect to home page
       router.push("/");
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "An error occurred while signing out.";
       toast({
         variant: "destructive",
-        title: "Logout failed",
-        description: error?.message || "An error occurred while logging out.",
+        title: "Sign out failed",
+        description: msg,
       });
     } finally {
       setLoggingOut(false);
@@ -93,305 +94,346 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     try {
-      // Simulate saving - you can implement actual API call here
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       toast({
         title: "Profile updated",
-        description: "Your profile has been updated successfully.",
+        description: "Your personal details have been saved.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Failed to update profile.";
       toast({
         variant: "destructive",
         title: "Update failed",
-        description: error?.message || "Failed to update profile.",
+        description: msg,
       });
     } finally {
       setSavingProfile(false);
     }
   };
 
-  // Helper function to get user initials
   const getInitials = () => {
     const first = user?.firstName || user?.email?.[0] || "";
     const last = user?.lastName || "";
     return `${first[0] || ""}${last[0] || ""}`.toUpperCase();
   };
 
-  // Show loading state while checking authentication
   if (status === "loading") {
     return (
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-5xl">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Loading settings...</p>
-          </div>
+      <div className="appearance-light bg-fill text-label min-h-[calc(100svh-3rem)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="size-6 animate-spin text-label-3" />
+          <p className="text-[13px] text-label-2">Loading settings…</p>
         </div>
       </div>
     );
   }
 
-  // Don't render if not authenticated (will redirect)
-  if (status === "unauthenticated") {
-    return null;
+  if (status !== "authenticated") {
+    return <div className="appearance-light bg-fill min-h-[calc(100svh-3rem)]" />;
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-5xl">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <SettingsIcon className="h-6 w-6 text-primary" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        </div>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences
-        </p>
-      </div>
+    <div className="appearance-light bg-fill text-label min-h-[calc(100svh-3rem)]">
+      <div className="mx-auto max-w-[760px] px-4 sm:px-6 py-8 lg:py-12">
+        <PageHeader
+          title="Settings"
+          subtitle="Manage your profile, authentication, and connected services."
+        />
 
-      {/* User Profile Card - Mobile Friendly */}
-      <Card className="mb-6 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-            {/* Avatar */}
-            <div className="relative">
-              <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-2xl font-bold text-primary-foreground shadow-lg">
+        {/* ── User Profile Identity Hero ── */}
+        <section className="mt-8 rounded-2xl bg-white border border-black/[0.06] p-6 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            {/* Avatar Squircle */}
+            <div className="relative shrink-0">
+              <div className="size-16 rounded-2xl bg-label text-white flex items-center justify-center text-[22px] font-semibold tracking-tight shadow-[0_4px_12px_rgba(0,0,0,0.12)]">
                 {getInitials()}
               </div>
-              <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
-                <Check className="h-3 w-3 text-white" />
-              </div>
+              <span className="absolute -bottom-1 -right-1 size-5 rounded-full bg-sys-green border-2 border-white flex items-center justify-center shadow-sm">
+                <Check className="size-3 text-white stroke-[3]" />
+              </span>
             </div>
 
-            {/* User Info */}
-            <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-2xl font-bold mb-1">
-                {user?.firstName && user?.lastName
-                  ? `${user.firstName} ${user.lastName}`
-                  : user?.email}
-              </h2>
-              <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 mb-3">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail className="h-4 w-4" />
-                  <span className="text-sm">{user?.email}</span>
-                </div>
+            {/* User Meta */}
+            <div className="flex-1 text-center sm:text-left min-w-0">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                <h2 className="text-[20px] font-semibold tracking-[-0.025em] text-label truncate">
+                  {user?.firstName && user?.lastName
+                    ? `${user.firstName} ${user.lastName}`
+                    : user?.email}
+                </h2>
                 {user?.role && (
-                  <Badge variant="secondary" className="capitalize">
-                    {user.role}
-                  </Badge>
+                  <span className="inline-flex items-center h-5 px-2 rounded-md bg-fill-2 text-[11px] font-medium text-label-2 capitalize">
+                    {user.role.toLowerCase()}
+                  </span>
                 )}
               </div>
-              <div className="flex items-center gap-2 justify-center sm:justify-start text-sm text-muted-foreground">
-                <UserCircle className="h-4 w-4" />
-                <span>User ID: {user?.id}</span>
+
+              <div className="mt-1.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1 text-[13px] text-label-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Mail className="size-3.5 text-label-3" aria-hidden />
+                  {user?.email}
+                </span>
+                {user?.id && (
+                  <span className="inline-flex items-center gap-1 text-label-3 font-mono text-[12px]">
+                    ID: {user.id}
+                  </span>
+                )}
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </section>
 
-      {/* Settings Tabs */}
-      <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3 h-auto">
-          <TabsTrigger value="profile" className="flex items-center gap-2 py-2">
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Profile</span>
-          </TabsTrigger>
-          <TabsTrigger value="account" className="flex items-center gap-2 py-2">
-            <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Account</span>
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2 py-2" disabled>
-            <Bell className="h-4 w-4" />
-            <span className="hidden sm:inline">Notifications</span>
-          </TabsTrigger>
-        </TabsList>
+        {/* ── Tab Selector (Apple-style Segmented) ── */}
+        <div className="mt-6 flex justify-center sm:justify-start">
+          <div className="inline-flex p-0.5 rounded-full bg-fill-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("profile")}
+              className={cn(
+                "inline-flex items-center gap-2 h-9 px-4 rounded-full text-[14px] font-medium transition-all duration-150",
+                activeTab === "profile"
+                  ? "bg-white text-label shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                  : "text-label-2 hover:text-label"
+              )}
+            >
+              <User className="size-4" aria-hidden />
+              Profile
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("account")}
+              className={cn(
+                "inline-flex items-center gap-2 h-9 px-4 rounded-full text-[14px] font-medium transition-all duration-150",
+                activeTab === "account"
+                  ? "bg-white text-label shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                  : "text-label-2 hover:text-label"
+              )}
+            >
+              <Shield className="size-4" aria-hidden />
+              Account
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("notifications")}
+              className={cn(
+                "inline-flex items-center gap-2 h-9 px-4 rounded-full text-[14px] font-medium transition-all duration-150",
+                activeTab === "notifications"
+                  ? "bg-white text-label shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                  : "text-label-2 hover:text-label"
+              )}
+            >
+              <Bell className="size-4" aria-hidden />
+              Notifications
+            </button>
+          </div>
+        </div>
 
-        {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>
-                Update your personal information and how others see you on {PRODUCT_NAME}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="John"
-                    disabled={savingProfile}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Doe"
-                    disabled={savingProfile}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={user?.email || ""}
-                  disabled
-                  className="bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Your email address is used for login and cannot be changed.
-                </p>
-              </div>
-
-              <Separator className="my-6" />
-
-              <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setFirstName(user?.firstName || "");
-                    setLastName(user?.lastName || "");
-                  }}
-                  disabled={savingProfile}
+        {/* ── Tab Content ── */}
+        <div className="mt-6">
+          <AnimatePresence mode="wait" initial={false}>
+            {activeTab === "profile" && (
+              <motion.div
+                key="tab-profile"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                className="space-y-6"
+              >
+                <Panel
+                  title="Personal Information"
+                  description={`How your identity is displayed across ${PRODUCT_NAME}.`}
                 >
-                  Reset
-                </Button>
-                <Button onClick={handleSaveProfile} disabled={savingProfile}>
-                  {savingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Changes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Account Tab */}
-        <TabsContent value="account" className="space-y-4">
-          {/* Session Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Session Management</CardTitle>
-              <CardDescription>
-                Manage your active sessions and sign out from {PRODUCT_NAME}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 rounded-lg border bg-muted/50">
-                <div className="flex items-start justify-between gap-4 flex-col sm:flex-row">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                      <p className="font-semibold">Current Session</p>
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <TextField
+                        label="First name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="John"
+                        disabled={savingProfile}
+                      />
+                      <TextField
+                        label="Last name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Appleseed"
+                        disabled={savingProfile}
+                      />
                     </div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Signed in as <span className="font-medium text-foreground">{user?.email}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      This is your active session on this device.
+
+                    <div className="space-y-1.5">
+                      <TextField
+                        label="Email address"
+                        type="email"
+                        value={user?.email || ""}
+                        disabled
+                        hint="Your email address is your login identity and cannot be changed."
+                      />
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-end gap-3 border-t border-black/[0.06]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFirstName(user?.firstName || "");
+                          setLastName(user?.lastName || "");
+                        }}
+                        disabled={savingProfile}
+                        className={btn.secondary}
+                      >
+                        Reset
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveProfile}
+                        disabled={savingProfile}
+                        className={btn.primary}
+                      >
+                        {savingProfile ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" aria-hidden />
+                            Saving…
+                          </>
+                        ) : (
+                          "Save changes"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </Panel>
+              </motion.div>
+            )}
+
+            {activeTab === "account" && (
+              <motion.div
+                key="tab-account"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                className="space-y-6"
+              >
+                {/* Active Session */}
+                <Panel
+                  title="Session"
+                  description="Details about your current authenticated session."
+                >
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-fill border border-black/[0.06]">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="relative flex size-2.5">
+                          <span className="absolute inset-0 rounded-full bg-sys-green animate-ping opacity-60" />
+                          <span className="relative size-2.5 rounded-full bg-sys-green" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[14px] font-medium text-label truncate">Current browser session</p>
+                          <p className="text-[12px] text-label-2 truncate mt-0.5">
+                            Authenticated as <span className="font-medium text-label">{user?.email}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center h-5 px-2 rounded-md bg-sys-green/10 text-[11px] font-medium text-sys-green shrink-0">
+                        Active
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="min-w-0 pr-4">
+                        <p className="text-[14px] font-medium text-label">Sign out of {PRODUCT_NAME}</p>
+                        <p className="text-[12px] text-label-2 mt-0.5">
+                          Terminate this active session on your current device.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        disabled={loggingOut}
+                        className={btn.secondary}
+                      >
+                        {loggingOut ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" aria-hidden />
+                            Signing out…
+                          </>
+                        ) : (
+                          <>
+                            <LogOut className="size-4" aria-hidden />
+                            Sign out
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </Panel>
+
+                {/* GitHub Integration */}
+                <Panel
+                  title="GitHub Integration"
+                  description="Connect your GitHub account to import repositories and enable automated preview builds."
+                >
+                  <GitHubConnectionCard token={token} />
+                </Panel>
+
+                {/* Destructive Zone (Clean Apple-Style) */}
+                <Panel
+                  title={<span className="text-sys-red">Delete Account</span>}
+                  description="Permanently delete your account and all associated deployment projects."
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-fill border border-black/[0.06]">
+                      <AlertTriangle className="size-4 text-sys-orange shrink-0 mt-0.5" aria-hidden />
+                      <div className="text-[13px] text-label-2 leading-relaxed">
+                        Deleting your account will immediately stop all active deployments, release your custom subdomains, and wipe your build artifacts. This operation is permanent and irreversible.
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4 pt-1">
+                      <p className="text-[12px] text-label-3">
+                        Self-serve account deletion is temporarily restricted.
+                      </p>
+                      <button
+                        type="button"
+                        disabled
+                        className={btn.dangerQuiet}
+                      >
+                        Delete account
+                      </button>
+                    </div>
+                  </div>
+                </Panel>
+              </motion.div>
+            )}
+
+            {activeTab === "notifications" && (
+              <motion.div
+                key="tab-notifications"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                className="space-y-6"
+              >
+                <Panel
+                  title="Notification Preferences"
+                  description="Configure deployment alerts, commit webhooks, and status messages."
+                >
+                  <div className="py-12 text-center space-y-3">
+                    <div className="size-12 rounded-full bg-fill-2 text-label-3 mx-auto grid place-items-center">
+                      <Bell className="size-5" />
+                    </div>
+                    <p className="text-[15px] font-medium text-label">Notifications are in preview</p>
+                    <p className="text-[13px] text-label-2 max-w-sm mx-auto">
+                      Granular email and webhook alerts for failed and successful builds will be available soon.
                     </p>
                   </div>
-                  <Badge variant="secondary" className="shrink-0">Active</Badge>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-semibold mb-2">Sign out</h4>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Signing out will end your current session. You&apos;ll need to sign in again to access your account.
-                  </p>
-                  <Button
-                    variant="destructive"
-                    onClick={handleLogout}
-                    disabled={loggingOut}
-                    className="w-full sm:w-auto"
-                  >
-                    {loggingOut ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing out...
-                      </>
-                    ) : (
-                      <>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign Out
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* GitHub Integration */}
-          <Card>
-            <CardHeader>
-              <CardTitle>GitHub Integration</CardTitle>
-              <CardDescription>
-                Connect your GitHub account to access private repositories and enable automatic deployments.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <GitHubConnectionCard token={token} />
-            </CardContent>
-          </Card>
-
-          {/* Danger Zone */}
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="text-destructive">Danger Zone</CardTitle>
-              <CardDescription>
-                Irreversible and destructive actions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 rounded-lg border border-destructive/20 bg-destructive/5">
-                <h4 className="font-semibold mb-2">Delete Account</h4>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Once you delete your account, there is no going back. This will permanently delete all your projects and data.
-                </p>
-                <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground" disabled>
-                  Delete Account
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  This feature is currently disabled. Contact support to delete your account.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Notifications Tab (Disabled) */}
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Configure how you receive notifications from {PRODUCT_NAME}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">This feature is coming soon.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                </Panel>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
     </div>
   );
 }

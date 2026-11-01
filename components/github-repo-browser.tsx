@@ -1,16 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Github, Loader2, RefreshCw, ExternalLink, Search, GitBranch } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { Github, Loader2, RefreshCw, Search, GitBranch, Lock } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { btn } from "@/components/project/ui";
 
 interface GitHubRepoBrowserProps {
     token: string | null;
@@ -122,8 +114,8 @@ export function GitHubRepoBrowser({ token, onSelectRepo, onBranchChange, selecte
             const data = await response.json();
             setRepos(data);
             setFilteredRepos(data);
-        } catch (err: any) {
-            setError(err?.message || "Failed to fetch repositories");
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Failed to fetch repositories");
         } finally {
             setLoading(false);
         }
@@ -148,7 +140,7 @@ export function GitHubRepoBrowser({ token, onSelectRepo, onBranchChange, selecte
 
             const data = await response.json();
             setBranches(data);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Failed to fetch branches:', err);
             setBranches([]);
         } finally {
@@ -163,177 +155,175 @@ export function GitHubRepoBrowser({ token, onSelectRepo, onBranchChange, selecte
         }
     };
 
+    /* ── Not connected ── */
     if (!githubConnected) {
         return (
-            <div className="p-4 rounded-lg border border-dashed bg-muted/30">
-                <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-muted">
-                        <Github className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1">
-                        <p className="text-sm font-medium mb-1">Connect GitHub to browse repositories</p>
-                        <p className="text-xs text-muted-foreground mb-3">
-                            Link your GitHub account in settings to quickly select repositories
+            <div className="rounded-xl border border-dashed border-black/[0.12] bg-fill/50 p-5">
+                <div className="flex items-start gap-3.5">
+                    <span className="size-9 shrink-0 rounded-lg bg-fill-2 grid place-items-center">
+                        <Github className="size-4 text-label-2" aria-hidden />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[15px] font-medium text-label">Connect GitHub to browse repositories</p>
+                        <p className="mt-1 text-[13px] text-label-2">
+                            Link your GitHub account in settings to quickly select repositories.
                         </p>
-                        <Button
+                        <button
                             type="button"
-                            variant="outline"
-                            size="sm"
                             onClick={() => window.location.href = "/settings"}
+                            className={cn(btn.secondary, "mt-3")}
                         >
-                            <Github className="mr-2 h-3.5 w-3.5" />
+                            <Github className="size-4" aria-hidden />
                             Go to Settings
-                        </Button>
+                        </button>
                     </div>
                 </div>
             </div>
         );
     }
 
+    /* ── Loading ── */
     if (loading && repos.length === 0) {
         return (
-            <div className="p-8 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="py-10 flex items-center justify-center">
+                <Loader2 className="size-5 animate-spin text-label-3" />
             </div>
         );
     }
 
+    /* ── Repo list ── */
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <Github className="h-4 w-4" />
-                    <p className="text-sm font-medium">Your GitHub Repositories</p>
-                    <Badge variant="secondary" className="text-xs">Connected</Badge>
+                    <Github className="size-4 text-label-2" aria-hidden />
+                    <p className="text-[14px] font-medium text-label">Your repositories</p>
+                    <span className="inline-flex items-center h-5 px-2 rounded-md bg-sys-green/10 text-[11px] font-medium text-sys-green">
+                        Connected
+                    </span>
                 </div>
-                <Button
+                <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={fetchRepos}
                     disabled={loading}
+                    className={btn.icon}
+                    aria-label="Refresh repositories"
                 >
-                    <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-                </Button>
+                    <RefreshCw className={cn("size-4", loading && "animate-spin")} />
+                </button>
             </div>
 
             {error && (
-                <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg">
+                <div className="rounded-xl bg-white border border-sys-red/20 px-4 py-3 text-[13px] text-sys-red">
                     {error}
                 </div>
             )}
 
             {repos.length > 0 && (
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-label-3" aria-hidden />
+                    <input
                         type="text"
-                        placeholder="Search repositories..."
+                        placeholder="Search repositories…"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 h-9"
+                        className="w-full h-10 rounded-xl border border-black/10 bg-white pl-10 pr-4 text-[14px] text-label placeholder:text-label-3 outline-none focus:border-apple-blue focus:shadow-[0_0_0_4px_rgba(0,113,227,0.15)]"
                     />
                 </div>
             )}
 
             {repos.length === 0 && !error && !loading && (
-                <div className="p-6 text-center text-sm text-muted-foreground border border-dashed rounded-lg">
-                    <p className="mb-2">No repositories found</p>
-                    <p className="text-xs">Create a repository on GitHub first</p>
+                <div className="rounded-xl border border-dashed border-black/[0.12] px-6 py-10 text-center">
+                    <p className="text-[15px] text-label-2">No repositories found.</p>
+                    <p className="mt-1 text-[13px] text-label-3">Create a repository on GitHub first.</p>
                 </div>
             )}
 
             {filteredRepos.length === 0 && repos.length > 0 && (
-                <div className="p-6 text-center text-sm text-muted-foreground border border-dashed rounded-lg">
-                    <p>No repositories match "{searchQuery}"</p>
-                </div>
+                <p className="py-8 text-center text-[14px] text-label-2">
+                    No repositories match &ldquo;{searchQuery}&rdquo;.
+                </p>
             )}
 
             {filteredRepos.length > 0 && (
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-                    {filteredRepos.map((repo) => (
-                        <button
-                            type="button"
-                            key={repo.id}
-                            onClick={() => {
-                                onSelectRepo(repo.clone_url, repo.default_branch);
-                                setSelectedBranch(repo.default_branch);
-                            }}
-                            className="w-full p-3 text-left rounded-lg border hover:bg-accent hover:border-primary/50 transition-all group"
-                        >
-                            <div className="flex items-start justify-between gap-2">
+                <div className="rounded-xl border border-black/[0.08] divide-y divide-black/[0.06] max-h-[320px] overflow-y-auto">
+                    {filteredRepos.map((repo) => {
+                        const isSelected = selectedRepoFullName === repo.full_name;
+                        return (
+                            <button
+                                type="button"
+                                key={repo.id}
+                                onClick={() => {
+                                    onSelectRepo(repo.clone_url, repo.default_branch);
+                                    setSelectedBranch(repo.default_branch);
+                                }}
+                                className={cn(
+                                    "w-full flex items-center gap-3.5 px-4 py-3.5 text-left transition-colors",
+                                    isSelected
+                                        ? "bg-apple-blue/[0.04]"
+                                        : "hover:bg-fill/60"
+                                )}
+                            >
+                                <span className="size-9 shrink-0 rounded-lg bg-fill grid place-items-center text-[13px] font-semibold text-label uppercase">
+                                    {repo.name[0]}
+                                </span>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <p className="font-medium text-sm truncate group-hover:text-primary">
+                                    <div className="flex items-center gap-2">
+                                        <p className={cn("text-[14px] font-medium truncate", isSelected ? "text-apple-blue" : "text-label")}>
                                             {repo.name}
                                         </p>
                                         {repo.private && (
-                                            <Badge variant="secondary" className="text-xs">
-                                                🔒 Private
-                                            </Badge>
-                                        )}
-                                        {repo.stargazers_count !== undefined && repo.stargazers_count > 0 && (
-                                            <span className="text-xs text-muted-foreground">
-                                                ⭐ {repo.stargazers_count}
-                                            </span>
+                                            <Lock className="size-3 text-label-3 shrink-0" aria-hidden />
                                         )}
                                     </div>
-                                    {repo.description && (
-                                        <p className="text-xs text-muted-foreground line-clamp-1 mb-1">
-                                            {repo.description}
-                                        </p>
-                                    )}
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-xs text-muted-foreground">
-                                            {repo.full_name}
-                                        </p>
-                                        <span className="text-xs text-muted-foreground">•</span>
-                                        <p className="text-xs text-muted-foreground">
-                                            {repo.default_branch}
-                                        </p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <p className="text-[12px] text-label-3 truncate">{repo.full_name}</p>
+                                        <span className="text-[12px] text-label-3">·</span>
+                                        <p className="text-[12px] text-label-3 shrink-0">{repo.default_branch}</p>
                                     </div>
                                 </div>
-                                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                        </button>
-                    ))}
+                                {isSelected && (
+                                    <span className="size-5 shrink-0 rounded-full bg-apple-blue grid place-items-center">
+                                        <svg className="size-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
 
             {/* Branch Selector */}
             {selectedRepoFullName && branches.length > 0 && (
-                <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                <div className="rounded-xl bg-fill p-4 space-y-2.5">
                     <div className="flex items-center gap-2">
-                        <GitBranch className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm font-medium">Select Branch</p>
+                        <GitBranch className="size-4 text-label-2" aria-hidden />
+                        <p className="text-[14px] font-medium text-label">Select branch</p>
                     </div>
-                    <Select value={selectedBranch} onValueChange={handleBranchChange}>
-                        <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Select a branch" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {branches.map((branch) => (
-                                <SelectItem key={branch.name} value={branch.name}>
-                                    <div className="flex items-center gap-2">
-                                        <span>{branch.name}</span>
-                                        {branch.protected && (
-                                            <Badge variant="outline" className="text-xs">Protected</Badge>
-                                        )}
-                                    </div>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                        {branches.length} branch{branches.length !== 1 ? 'es' : ''} available
+                    <select
+                        value={selectedBranch}
+                        onChange={(e) => handleBranchChange(e.target.value)}
+                        className="block w-full h-10 rounded-xl border border-black/10 bg-white px-3.5 text-[14px] text-label outline-none focus:border-apple-blue focus:shadow-[0_0_0_4px_rgba(0,113,227,0.15)] appearance-none cursor-pointer"
+                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}
+                    >
+                        {branches.map((branch) => (
+                            <option key={branch.name} value={branch.name}>
+                                {branch.name}{branch.protected ? " (protected)" : ""}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-[12px] text-label-3">
+                        {branches.length} branch{branches.length !== 1 ? "es" : ""} available.
                     </p>
                 </div>
             )}
 
             {loadingBranches && (
-                <div className="p-3 rounded-lg border bg-muted/30 flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <p className="text-sm text-muted-foreground">Loading branches...</p>
+                <div className="rounded-xl bg-fill p-4 flex items-center gap-2.5">
+                    <Loader2 className="size-4 animate-spin text-label-3" />
+                    <p className="text-[13px] text-label-2">Loading branches…</p>
                 </div>
             )}
         </div>
