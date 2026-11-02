@@ -1,403 +1,331 @@
 "use client";
-export const dynamic = "force-dynamic";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowDown, Check, CheckCircle2, ChevronLeft, Copy, ExternalLink, GitBranch, GitCommitHorizontal, Pause, Play, XCircle } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { apiFetchAuth } from "../../lib/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, ExternalLink, ArrowLeft, Terminal } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { btn, EnvPill, isInProgress, StatusDot } from "@/components/project/ui";
 
-const renderRealLogLine = (line: string, idx: number) => {
-  if (!line) return null;
-  const match = line.match(/^(\[\d+\/\d+\/\d+, \d+:\d+:\d+ [AP]M\])\s?(.*)/);
+// Build logs in the pushly-ui style: a light console with line numbers and timestamps, that
+// follows new output, plus a calm result banner. Same log-service and status polling as before.
 
-  if (match) {
-    const timestamp = match[1];
-    const content = match[2];
+type DeploymentInfo = {
+  status: string;
+  deployedUrl?: string | null;
+  environment?: string;
+  gitBranch?: string;
+  gitCommitHash?: string;
+  gitCommitMessage?: string;
+};
 
-    let contentEl: React.ReactNode = <span className="text-zinc-300">{content}</span>;
+const DONE_OK = ["SUCCESS", "COMPLETED"];
+const DONE_BAD = ["FAILED", "STOPPED"];
 
-    // Syntax highlighting logic
-    if (content.includes("View it at") || content.includes("http")) {
-      const urlMatch = content.match(/(https?:\/\/[^\s]+)/);
-      if (urlMatch) {
-        const url = urlMatch[1];
-        const parts = content.split(url);
-        contentEl = (
-          <span className="text-emerald-400 font-medium">
-            {parts[0]}
-            <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline underline-offset-4 hover:text-white transition-colors relative z-20">
-              {url}
-            </a>
-            {parts[1]}
-          </span>
-        );
-      }
-    } else if (content.includes("✅") || content.includes("done") || content.includes("✨") || content.includes("🚀") || content.includes("✓")) {
-      contentEl = <span className="text-emerald-400 font-medium">{content}</span>;
-    } else if (content.includes("Progress:") || content.includes("Framework:") || content.includes("Build Command:") || content.includes("→")) {
-      contentEl = <span className="text-cyan-400">{content}</span>;
-    } else if (content.includes("Update available!") || content.includes("│") || content.includes("╭") || content.includes("╰")) {
-      contentEl = <span className="text-yellow-400">{content}</span>;
-    } else if (content.includes("🔨") || content.includes("📥") || content.includes("Install Command:")) {
-      contentEl = <span className="text-blue-400">{content}</span>;
-    }
+// Colour only where it carries meaning
+function lineTone(text: string) {
+  if (/\b(error|failed|fatal|err!)\b/i.test(text) || text.includes("❌")) return "text-sys-red";
+  if (/\bwarn(ing)?\b/i.test(text)) return "text-[#c93400]";
+  if (/(✅|✨|🚀|✓|\bdone\b|\bsuccess)/i.test(text)) return "text-[#248a3d]";
+  return "text-label";
+}
 
-    return (
-      <div className="font-mono text-[13px] leading-snug break-all hover:bg-white/5 px-4 md:px-6 py-0.5 rounded transition-colors group cursor-crosshair flex">
-        <span className="text-zinc-600 mr-2 shrink-0 inline-block w-[35px] text-right">
-          [{idx + 1}]
-        </span>
-        <span className="text-zinc-600 mr-3 truncate shrink-0 inline-block group-hover:text-zinc-400 transition-colors w-[180px]">
-          {timestamp}
-        </span>
-        <div className="flex-1">{contentEl}</div>
-      </div>
-    );
-  }
-
-  // Fallback for lines without timestamp
+function LogLine({ line, n }: { line: string; n: number }) {
+  const m = line.match(/^\[(\d+\/\d+\/\d+, \d+:\d+:\d+(?: [AP]M)?)\]\s?(.*)/);
+  const ts = m?.[1];
+  const text = m ? m[2] : line;
+  const url = text.match(/(https?:\/\/[^\s]+)/)?.[1];
+  const body = url ? (
+    <>
+      {text.split(url)[0]}
+      <a href={url} target="_blank" rel="noopener noreferrer" className="text-link underline underline-offset-2">
+        {url}
+      </a>
+      {text.split(url)[1]}
+    </>
+  ) : (
+    text
+  );
   return (
-    <div className="font-mono text-[13px] leading-snug break-all hover:bg-white/5 px-4 md:px-6 py-0.5 rounded transition-colors group cursor-crosshair flex">
-      <span className="text-zinc-600 mr-2 shrink-0 inline-block w-[35px] text-right">
-        [{idx + 1}]
-      </span>
-      <div className="text-zinc-300 flex-1">{line}</div>
+    <div className="flex gap-3 px-4 md:px-5 py-px hover:bg-black/[0.03]">
+      <span className="w-8 shrink-0 text-right text-label-3 select-none tabular-nums">{n}</span>
+      {ts && <span className="hidden md:inline w-[168px] shrink-0 text-label-3 select-none tabular-nums">{ts}</span>}
+      <span className={cn("flex-1 min-w-0 whitespace-pre-wrap break-words", lineTone(text))}>{body}</span>
     </div>
   );
-};
+}
 
 export default function LogsPage() {
   const params = useSearchParams();
   const router = useRouter();
   const projectId = params.get("projectId");
   const deploymentId = params.get("deploymentId");
+  const { token, status } = useAuth();
+
   const [logs, setLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const { token, status } = useAuth();
-  const seenIdsRef = useRef<Set<string | number>>(new Set());
-  const logsEndRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [deployment, setDeployment] = useState<DeploymentInfo | null>(null);
+  const [projectName, setProjectName] = useState<string | null>(null);
+  const [follow, setFollow] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const seenIdsRef = useRef<Set<string | number>>(new Set());
+  const consoleRef = useRef<HTMLDivElement>(null);
 
-  const [deploymentStatus, setDeploymentStatus] = useState<string | null>(null);
-  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const st = (deployment?.status ?? "").toUpperCase();
+  const finished = DONE_OK.includes(st) || DONE_BAD.includes(st);
 
-  const scrollToBottom = useCallback(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+  useEffect(() => {
+    if (status === "unauthenticated") router.replace("/login");
+  }, [status, router]);
 
-  // Poll deployment status
+  // Project name for the back link
+  useEffect(() => {
+    if (!projectId || !token) return;
+    apiFetchAuth<{ name?: string }>(`/api/projects/${projectId}`, token)
+      .then((p) => setProjectName(p?.name ?? null))
+      .catch(() => setProjectName(null));
+  }, [projectId, token]);
+
   const fetchDeploymentStatus = useCallback(async () => {
-    if (!projectId || !deploymentId || status !== "authenticated" || !token) return;
-
+    if (!projectId || !deploymentId || !token) return;
     try {
-      const deployment = await apiFetchAuth<{
-        status: string;
-        deployedUrl?: string;
-      }>(`/api/projects/${projectId}/deployments/${deploymentId}`, token);
-
-      setDeploymentStatus(deployment.status);
-      if (deployment.deployedUrl) {
-        setDeploymentUrl(deployment.deployedUrl);
-      }
-
-      // Check if deployment is complete
-      if (deployment.status === "SUCCESS" || deployment.status === "COMPLETED" || deployment.status === "RUNNING") {
-        // Only show success for SUCCESS/COMPLETED, not RUNNING
-        if (deployment.status === "SUCCESS" || deployment.status === "COMPLETED") {
-          setShowSuccess(true);
-          setIsPaused(true); // Stop log fetching
-        }
-      }
-
-    } catch (e: any) {
+      const d = await apiFetchAuth<DeploymentInfo>(`/api/projects/${projectId}/deployments/${deploymentId}`, token);
+      setDeployment(d);
+    } catch (e) {
       console.error("Failed to fetch deployment status:", e);
     }
-  }, [projectId, deploymentId, token, status]);
+  }, [projectId, deploymentId, token]);
 
   const fetchLogs = useCallback(async () => {
-    if (!projectId || !deploymentId || status !== "authenticated" || !token || isPaused) return;
-
+    if (!projectId || !deploymentId || !token) return;
     const url = `${process.env.NEXT_PUBLIC_LOG_SERVICE_URL}/logs/${projectId}/${deploymentId}`;
-
     try {
-      const r = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "text/plain, */*",
-        },
-        cache: "no-store",
-      });
-
-      if (!r.ok) throw new Error(await r.text());
-
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "text/plain, */*" }, cache: "no-store" });
+      if (!r.ok) throw new Error((await r.text()) || `Logs request failed (${r.status})`);
       const ct = r.headers.get("content-type") || "";
-
       if (ct.includes("application/json")) {
         const data = await r.json();
         if (!Array.isArray(data)) {
           setLogs([JSON.stringify(data, null, 2)]);
           return;
         }
-
         const newLines: string[] = [];
         for (const item of data) {
           const id = item?.id ?? `${item?.timestamp}-${item?.message}`;
-          if (!seenIdsRef.current.has(id)) {
-            seenIdsRef.current.add(id);
-            const ts = item?.timestamp ? new Date(item.timestamp).toLocaleString() : "";
-            const raw = typeof item?.message === "string" ? item.message : JSON.stringify(item?.message);
-
-            // Fix 5: messages are batched as \n-separated lines — split each one
-            const lines = raw.split("\n").map((l: string) => l.trim()).filter(Boolean);
-            for (const line of lines) {
-              newLines.push(ts ? `[${ts}] ${line}` : line);
-            }
-          }
+          if (seenIdsRef.current.has(id)) continue;
+          seenIdsRef.current.add(id);
+          const ts = item?.timestamp ? new Date(item.timestamp).toLocaleString() : "";
+          const raw = typeof item?.message === "string" ? item.message : JSON.stringify(item?.message);
+          // Messages arrive batched as \n-separated lines
+          for (const line of raw.split("\n").map((l: string) => l.trim()).filter(Boolean)) newLines.push(ts ? `[${ts}] ${line}` : line);
         }
-
-        if (newLines.length > 0) {
-          setLogs((prev) => {
-            const updated = [...prev, ...newLines];
-            return updated.slice(-1000);
-          });
-          setTimeout(scrollToBottom, 100);
-        }
+        if (newLines.length > 0) setLogs((prev) => [...prev, ...newLines].slice(-1000));
       } else {
-        const text = await r.text();
-        const lines = text.split("\n");
-        setLogs((prev) => {
-          const updated = [...prev, ...lines.filter((line, idx) =>
-            !prev.some(p => p === line && prev.indexOf(p) === prev.length - lines.length + idx)
-          )];
-          return updated.slice(-1000);
-        });
-        setTimeout(scrollToBottom, 100);
+        const lines = (await r.text()).split("\n");
+        setLogs((prev) =>
+          [...prev, ...lines.filter((line, idx) => !prev.some((p) => p === line && prev.indexOf(p) === prev.length - lines.length + idx))].slice(-1000)
+        );
       }
       setError(null);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn’t load logs.");
     }
-  }, [projectId, deploymentId, token, status, isPaused, scrollToBottom]);
+  }, [projectId, deploymentId, token]);
 
-  // Poll logs
+  // Logs every 3s until paused or finished (one last fetch after finishing catches the final lines)
   useEffect(() => {
-    if (!projectId || !deploymentId) return;
-    if (status !== "authenticated" || !token) return;
+    if (!projectId || !deploymentId || status !== "authenticated" || !token || isPaused) return;
+    void fetchLogs();
+    if (finished) return;
+    const t = setInterval(fetchLogs, 3000);
+    return () => clearInterval(t);
+  }, [projectId, deploymentId, status, token, isPaused, finished, fetchLogs]);
 
-    fetchLogs();
-
-    const interval = setInterval(() => {
-      if (!isPaused) {
-        fetchLogs();
-      }
-    }, 3000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [projectId, deploymentId, token, status, fetchLogs, isPaused]);
-
-  // Poll deployment status
+  // Status every 5s until the build has finished
   useEffect(() => {
-    if (!projectId || !deploymentId) return;
-    if (status !== "authenticated" || !token) return;
+    if (!projectId || !deploymentId || status !== "authenticated" || !token || finished) return;
+    void fetchDeploymentStatus();
+    const t = setInterval(fetchDeploymentStatus, 5000);
+    return () => clearInterval(t);
+  }, [projectId, deploymentId, status, token, finished, fetchDeploymentStatus]);
 
-    fetchDeploymentStatus();
-
-    const interval = setInterval(() => {
-      if (!showSuccess) {
-        fetchDeploymentStatus();
-      }
-    }, 5000); // Poll status every 5 seconds
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [projectId, deploymentId, token, status, fetchDeploymentStatus, showSuccess]);
-
+  // Follow the newest line unless the reader has scrolled up
   useEffect(() => {
-    scrollToBottom();
-  }, [logs, scrollToBottom]);
+    const el = consoleRef.current;
+    if (el && follow) el.scrollTop = el.scrollHeight;
+  }, [logs, follow]);
 
-  // Normal logs view - MUST be before any conditional returns due to React hooks rules
-  const displayContent = useMemo(() => {
-    if (status === "loading") {
-      return (
-        <div className="space-y-2">
-          {Array(5).fill(0).map((_, i) => (
-            <Skeleton key={i} className="h-4 w-full" />
-          ))}
-        </div>
-      );
-    }
+  const onConsoleScroll = () => {
+    const el = consoleRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    if (nearBottom !== follow) setFollow(nearBottom);
+  };
 
-    if (!projectId || !deploymentId) {
-      return <p className="text-muted-foreground">Pass projectId and deploymentId in query string.</p>;
-    }
+  const copyLogs = async () => {
+    await navigator.clipboard.writeText(logs.join("\n"));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-    if (status !== "authenticated") {
-      return <p className="text-muted-foreground">Please sign in to view logs.</p>;
-    }
+  const commit = deployment?.gitCommitHash && deployment.gitCommitHash !== "pending" ? deployment.gitCommitHash.slice(0, 7) : null;
+  const live = DONE_OK.includes(st);
+  const failed = DONE_BAD.includes(st);
 
-    if (error) {
-      return <p className="text-destructive">{error}</p>;
-    }
-
-    if (logs.length === 0) {
-      return <div className="p-6 text-zinc-500 font-mono text-[13px]">Waiting for active terminal stream...</div>;
-    }
-
+  if (!projectId || !deploymentId) {
     return (
-      <div className="flex-1 py-4 overflow-y-auto overflow-x-hidden scroll-smooth scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent custom-scrollbar">
-        {logs.map((line, idx) => (
-          <div key={idx}>
-            {renderRealLogLine(line, idx)}
-          </div>
-        ))}
-        <div ref={logsEndRef} />
-      </div>
-    );
-  }, [status, projectId, deploymentId, error, logs]);
-
-  // Success screen
-  if (showSuccess && deploymentUrl) {
-    return (
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
-        <Card className="max-w-2xl mx-auto">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-6">
-              <div className="flex justify-center">
-                <div className="rounded-full bg-green-500/10 p-3">
-                  <CheckCircle2 className="w-16 h-16 text-green-500" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h2 className="text-2xl font-bold">🎉 Deployment Successful!</h2>
-                <p className="text-muted-foreground">
-                  Your app is now live and ready to use
-                </p>
-              </div>
-
-              <div className="p-4 rounded-lg bg-muted/50 border">
-                <p className="text-sm text-muted-foreground mb-2">Live URL:</p>
-                <a
-                  href={deploymentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline font-mono text-sm flex items-center justify-center gap-2"
-                >
-                  {deploymentUrl}
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-
-              <div className="flex gap-3 justify-center pt-4">
-                <Button
-                  onClick={() => window.open(deploymentUrl, "_blank")}
-                  className="gap-2"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Visit App
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => router.push(`/project/${projectId}`)}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to Project
-                </Button>
-              </div>
-
-              <details className="pt-4">
-                <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                  View Build Logs
-                </summary>
-                <div className="mt-4 bg-muted/50 rounded-lg border p-4 max-h-[40vh] overflow-auto font-mono text-xs text-left">
-                  <div className="space-y-1">
-                    {logs.map((line, idx) => (
-                      <div key={idx} className="whitespace-pre-wrap break-words leading-relaxed">
-                        <span className="text-muted-foreground">[{idx + 1}]</span> {line}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </details>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="appearance-light bg-fill min-h-[calc(100svh-3rem)] grid place-items-center px-4">
+        <p className="text-[15px] text-label-2">Open logs from a deployment to see its build output.</p>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 max-w-7xl">
-
-      {/* Header Area */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            Project Logs
-            {deploymentStatus && (
-              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${deploymentStatus === "DEPLOYING" || deploymentStatus === "RUNNING"
-                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                : deploymentStatus === "SUCCESS" || deploymentStatus === "COMPLETED"
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                  : deploymentStatus === "FAILED"
-                    ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                    : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
-                }`}>
-                {deploymentStatus}
-              </span>
-            )}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {projectId && deploymentId
-              ? `Streaming real-time output for deployment id: ${deploymentId}`
-              : "View deployment logs"}
-          </p>
-        </div>
-        <button
-          onClick={() => setIsPaused(!isPaused)}
-          className="text-xs font-semibold px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-foreground transition-colors"
+    <div className="appearance-light bg-fill text-label min-h-[calc(100svh-3rem)]">
+      <div className="mx-auto max-w-[1100px] px-4 sm:px-6 py-6 sm:py-10 space-y-5">
+        <Link
+          href={`/project/${projectId}/deployments`}
+          className="inline-flex items-center gap-1 h-8 -ml-1 pr-2 text-[13px] text-label-2 hover:text-label transition-colors"
         >
-          {isPaused ? "▶ Resume Stream" : "⏸ Pause Stream"}
-        </button>
-      </div>
+          <ChevronLeft className="size-4" aria-hidden />
+          {projectName ?? "Project"}
+        </Link>
 
-      {/* Terminal Window */}
-      <div className="w-full h-[65vh] min-h-[500px] max-h-[800px]">
-        <div className="bg-[#0c0c0e] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-full w-full relative">
-
-          {/* Top Traffic Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#18181b] z-10 relative">
-            <div className="flex items-center gap-2">
-              <Terminal size={14} className="text-zinc-500" />
-              <span className="text-xs font-medium text-zinc-400">
-                {deploymentId ? `deployment-${deploymentId} - logs` : `bash - production logs`}
-              </span>
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-title text-label">Build logs</h1>
+              {deployment && <StatusDot status={deployment.status} className="text-[14px] text-label" />}
             </div>
-            <div className="flex gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
-              <span className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
-            </div>
+            <p className="mt-2 flex items-center gap-2 flex-wrap text-[13px] text-label-2">
+              <span className="tabular-nums">Deployment #{deploymentId}</span>
+              {deployment?.environment && <EnvPill environment={deployment.environment} />}
+              {deployment?.gitBranch && (
+                <span className="inline-flex items-center gap-1 font-mono text-[12px]">
+                  <GitBranch className="size-3.5" aria-hidden />
+                  {deployment.gitBranch}
+                </span>
+              )}
+              {commit && (
+                <span className="inline-flex items-center gap-1 font-mono text-[12px]">
+                  <GitCommitHorizontal className="size-3.5" aria-hidden />
+                  {commit}
+                </span>
+              )}
+              {deployment?.gitCommitMessage && <span className="truncate max-w-[340px] text-label-3">{deployment.gitCommitMessage}</span>}
+            </p>
           </div>
-
-          {/* Log Stream Body */}
-          <div className="flex flex-col flex-1 overflow-hidden relative z-10">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,180,255,0.01),transparent_80%)] pointer-events-none" />
-
-            {/* Real Content via displayContent */}
-            {displayContent}
-
+          <div className="flex items-center gap-2 shrink-0">
+            {!finished && (
+              <button type="button" className={btn.secondary} onClick={() => setIsPaused((p) => !p)}>
+                {isPaused ? <Play className="size-4" aria-hidden /> : <Pause className="size-4" aria-hidden />}
+                {isPaused ? "Resume" : "Pause"}
+              </button>
+            )}
+            <button type="button" className={btn.secondary} onClick={copyLogs} disabled={logs.length === 0}>
+              {copied ? <Check className="size-4 text-sys-green" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+            {deployment?.deployedUrl && (
+              <a href={deployment.deployedUrl} target="_blank" rel="noopener noreferrer" className={btn.primary}>
+                Visit
+                <ExternalLink className="size-3.5" aria-hidden />
+              </a>
+            )}
           </div>
         </div>
+
+        {/* Result */}
+        <AnimatePresence initial={false}>
+          {(live || failed) && (
+            <motion.div
+              key={live ? "live" : "failed"}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.45 }}
+              className="rounded-2xl bg-white border border-black/[0.06] px-5 md:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            >
+              <div className="flex items-start gap-3 min-w-0">
+                {live ? <CheckCircle2 className="size-6 text-sys-green shrink-0" aria-hidden /> : <XCircle className="size-6 text-sys-red shrink-0" aria-hidden />}
+                <div className="min-w-0">
+                  <p className="text-[15px] font-medium text-label">{live ? "Deployed. Your app is live." : "This build didn’t finish."}</p>
+                  {live && deployment?.deployedUrl ? (
+                    <a href={deployment.deployedUrl} target="_blank" rel="noopener noreferrer" className="text-[13px] text-link hover:underline break-all">
+                      {deployment.deployedUrl.replace(/^https?:\/\//, "")}
+                    </a>
+                  ) : (
+                    <p className="text-[13px] text-label-2">The last lines below usually say why.</p>
+                  )}
+                </div>
+              </div>
+              <Link href={`/project/${projectId}`} className={cn(btn.secondary, "shrink-0")}>
+                Back to project
+              </Link>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Console */}
+        <section className="relative rounded-2xl bg-white border border-black/[0.06] overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-4 md:px-5 h-11 border-b border-black/[0.06]">
+            <p className="text-[13px] font-medium text-label">Output</p>
+            <p className="flex items-center gap-2 text-[12px] text-label-3 tabular-nums">
+              {!finished && !isPaused && deployment && isInProgress(deployment.status) && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full bg-sys-orange animate-pulse" /> Streaming
+                </span>
+              )}
+              {isPaused && !finished && <span>Paused</span>}
+              <span>
+                {logs.length} line{logs.length === 1 ? "" : "s"}
+              </span>
+            </p>
+          </div>
+
+          <div
+            ref={consoleRef}
+            onScroll={onConsoleScroll}
+            className="h-[62svh] min-h-[360px] max-h-[760px] overflow-y-auto bg-[#fbfbfd] py-3 font-mono text-[12.5px] leading-[1.7]"
+            role="log"
+            aria-live="polite"
+            aria-label="Build output"
+          >
+            {error ? (
+              <p className="px-5 text-sys-red">{error}</p>
+            ) : logs.length === 0 ? (
+              <p className="px-5 inline-flex items-center gap-2 text-label-3">
+                <span className="size-1.5 rounded-full bg-label-3 animate-pulse" />
+                Waiting for the build to start…
+              </p>
+            ) : (
+              logs.map((line, i) => <LogLine key={i} line={line} n={i + 1} />)
+            )}
+          </div>
+
+          {/* Back to the newest output after scrolling up */}
+          <AnimatePresence>
+            {!follow && logs.length > 0 && (
+              <motion.button
+                type="button"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                onClick={() => setFollow(true)}
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-label/90 text-white text-[13px] backdrop-blur-xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+              >
+                <ArrowDown className="size-4" aria-hidden />
+                Jump to latest
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </section>
       </div>
     </div>
   );

@@ -1,397 +1,266 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Check, Copy, Github, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { API_BASE_URL } from "@/lib/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { GITHUB_CLIENT_ID, PRODUCT_NAME } from "@/lib/config";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  User,
-  Mail,
-  LogOut,
-  Shield,
-  Bell,
-  Loader2,
-  Check,
-  UserCircle,
-  Settings as SettingsIcon,
-  Github,
-  Link as LinkIcon,
-  Unlink,
-} from "lucide-react";
-import { PRODUCT_NAME } from "@/lib/config";
-import { GitHubConnectionCard } from "@/components/github-connection-card";
+import { cn } from "@/lib/utils";
+import { btn, ConfirmDialog, Panel, Spinner } from "@/components/project/ui";
+
+// Account settings in the pushly-ui style: one centred column, like an Apple account page.
+// Same endpoints as before (GitHub status/connect/disconnect, logout); no backend changes.
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-6 py-3.5 first:pt-0 last:pb-0">
+      <span className="text-[13px] text-label-2 shrink-0">{label}</span>
+      <div className="text-[15px] text-label min-w-0 sm:text-right">{children}</div>
+    </div>
+  );
+}
+
+function CopyValue({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <span className="inline-flex items-center gap-1 min-w-0">
+      <span className="font-mono text-[13px] truncate">{value}</span>
+      <button
+        type="button"
+        onClick={async () => {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }}
+        className={cn(btn.icon, "size-8 shrink-0")}
+        aria-label="Copy account ID"
+      >
+        {copied ? <Check className="size-4 text-sys-green" /> : <Copy className="size-3.5" />}
+      </button>
+    </span>
+  );
+}
+
+/* ── GitHub (logic carried over from the old GitHubConnectionCard) ── */
+
+function GitHubPanel({ token }: { token: string | null }) {
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const [connected, setConnected] = useState(false);
+  const [username, setUsername] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [confirm, setConfirm] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  const checkStatus = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/github/status`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setConnected(!!data.connected);
+        setUsername(data.githubUsername || "");
+      }
+    } catch (e) {
+      console.error("Failed to check GitHub status:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void checkStatus();
+  }, [checkStatus]);
+
+  // Result of the GitHub OAuth round trip (?github=connected|error)
+  useEffect(() => {
+    const result = searchParams?.get("github");
+    if (!result) return;
+    if (result === "connected") {
+      toast({ title: "GitHub connected" });
+      void checkStatus();
+    } else if (result === "error") {
+      toast({ variant: "destructive", title: "GitHub connection failed", description: searchParams?.get("message") || undefined });
+    }
+    window.history.replaceState({}, "", "/settings");
+  }, [searchParams, toast, checkStatus]);
+
+  const connect = () => {
+    if (!token) return;
+    // JWT goes as the OAuth state (tokens live in localStorage, not cookies)
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=repo,read:user&state=${encodeURIComponent(token)}`;
+  };
+
+  const disconnect = async () => {
+    if (!token) return;
+    setDisconnecting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/github`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      setConnected(false);
+      setUsername("");
+      setConfirm(false);
+      toast({ title: "GitHub disconnected" });
+    } catch {
+      toast({ variant: "destructive", title: "Couldn’t disconnect GitHub" });
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  return (
+    <Panel title="GitHub" description="Import private repositories and let pushes deploy automatically.">
+      {loading ? (
+        <div className="h-11 rounded-xl bg-fill animate-pulse" />
+      ) : connected ? (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="size-11 rounded-full bg-label text-white grid place-items-center shrink-0">
+              <Github className="size-5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[15px] font-medium text-label truncate">{username ? `@${username}` : "Connected"}</p>
+              <p className="inline-flex items-center gap-1.5 text-[13px] text-label-2">
+                <span className="size-2 rounded-full bg-sys-green" /> Connected
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {username && (
+              <a href={`https://github.com/${username}`} target="_blank" rel="noopener noreferrer" className={btn.secondary}>
+                View profile
+              </a>
+            )}
+            <button type="button" className={btn.dangerQuiet} onClick={() => setConfirm(true)}>
+              Disconnect
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-[15px] text-label-2">Not connected. Public repositories still work with a Git URL.</p>
+          <button type="button" className={cn(btn.primary, "shrink-0")} onClick={connect}>
+            <Github className="size-4" aria-hidden />
+            Connect GitHub
+          </button>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirm}
+        onOpenChange={(o) => !disconnecting && setConfirm(o)}
+        title="Disconnect GitHub?"
+        description="Pushly will lose access to your private repositories until you connect again."
+        confirmLabel="Disconnect"
+        tone="danger"
+        busy={disconnecting}
+        onConfirm={disconnect}
+      />
+    </Panel>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
   const { user, token, status, logout } = useAuth();
   const { toast } = useToast();
-  const [loggingOut, setLoggingOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
-  // Redirect to login if not authenticated
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
+    if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
 
-  // Profile edit states
-  const [firstName, setFirstName] = useState(user?.firstName || "");
-  const [lastName, setLastName] = useState(user?.lastName || "");
-  const [savingProfile, setSavingProfile] = useState(false);
-
-  const handleLogout = async () => {
-    setLoggingOut(true);
+  const signOut = async () => {
+    setSigningOut(true);
     try {
-      // Call the backend logout endpoint if token exists
       if (token) {
-        try {
-          // Use direct fetch since logout endpoint returns plain text, not JSON
-          await fetch(`${API_BASE_URL}/api/auth/logout`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          });
-          // Don't parse response as JSON - logout endpoint returns plain text
-        } catch (error) {
-          // Continue with local logout even if backend fails
-          console.error("Backend logout failed:", error);
-        }
+        // Logout returns plain text, so this isn't parsed; local sign-out happens regardless
+        await fetch(`${API_BASE_URL}/api/auth/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        }).catch((e) => console.error("Backend logout failed:", e));
       }
-
-      // Clear local auth state
       await logout();
-
-      toast({
-        title: "Logged out successfully",
-        description: "You have been logged out of your account.",
-      });
-
-      // Redirect to home page
+      toast({ title: "Signed out" });
       router.push("/");
       router.refresh();
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Logout failed",
-        description: error?.message || "An error occurred while logging out.",
-      });
-    } finally {
-      setLoggingOut(false);
+    } catch {
+      toast({ variant: "destructive", title: "Couldn’t sign out" });
+      setSigningOut(false);
     }
   };
 
-  const handleSaveProfile = async () => {
-    setSavingProfile(true);
-    try {
-      // Simulate saving - you can implement actual API call here
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
+  const initials = ((user?.firstName?.[0] ?? user?.email?.[0] ?? "") + (user?.lastName?.[0] ?? "")).toUpperCase();
 
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Update failed",
-        description: error?.message || "Failed to update profile.",
-      });
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
-  // Helper function to get user initials
-  const getInitials = () => {
-    const first = user?.firstName || user?.email?.[0] || "";
-    const last = user?.lastName || "";
-    return `${first[0] || ""}${last[0] || ""}`.toUpperCase();
-  };
-
-  // Show loading state while checking authentication
-  if (status === "loading") {
+  if (status !== "authenticated") {
     return (
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-5xl">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="text-muted-foreground">Loading settings...</p>
-          </div>
+      <div className="appearance-light bg-fill min-h-[calc(100svh-3rem)]">
+        <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 space-y-5" aria-busy="true">
+          <div className="h-20 rounded-2xl bg-white/60" />
+          <div className="h-48 rounded-2xl bg-white/60" />
         </div>
       </div>
     );
   }
 
-  // Don't render if not authenticated (will redirect)
-  if (status === "unauthenticated") {
-    return null;
-  }
-
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-5xl">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <SettingsIcon className="h-6 w-6 text-primary" />
+    <div className="appearance-light bg-fill text-label min-h-[calc(100svh-3rem)]">
+      <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-8 sm:py-12 space-y-5">
+        {/* Account header */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 text-center sm:text-left pb-3">
+          <span className="size-20 rounded-full bg-gradient-to-b from-[#8e8e93] to-[#636366] text-white grid place-items-center text-[28px] font-semibold tracking-[-0.02em] shrink-0" aria-hidden>
+            {initials || "·"}
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-title text-label truncate">{fullName || user?.email}</h1>
+            <p className="mt-1 text-[15px] text-label-2 truncate">{user?.email}</p>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         </div>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences
-        </p>
-      </div>
 
-      {/* User Profile Card - Mobile Friendly */}
-      <Card className="mb-6 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-            {/* Avatar */}
-            <div className="relative">
-              <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-2xl font-bold text-primary-foreground shadow-lg">
-                {getInitials()}
-              </div>
-              <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
-                <Check className="h-3 w-3 text-white" />
-              </div>
-            </div>
-
-            {/* User Info */}
-            <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-2xl font-bold mb-1">
-                {user?.firstName && user?.lastName
-                  ? `${user.firstName} ${user.lastName}`
-                  : user?.email}
-              </h2>
-              <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 mb-3">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail className="h-4 w-4" />
-                  <span className="text-sm">{user?.email}</span>
-                </div>
-                {user?.role && (
-                  <Badge variant="secondary" className="capitalize">
-                    {user.role}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-2 justify-center sm:justify-start text-sm text-muted-foreground">
-                <UserCircle className="h-4 w-4" />
-                <span>User ID: {user?.id}</span>
-              </div>
-            </div>
+        <Panel title="Profile" description={`How you appear on ${PRODUCT_NAME}.`} footer={<p className="text-[12px] text-label-3">Changing your name or email isn’t available yet.</p>}>
+          <div className="divide-y divide-black/[0.06]">
+            <Row label="First name">{user?.firstName || "—"}</Row>
+            <Row label="Last name">{user?.lastName || "—"}</Row>
+            <Row label="Email">{user?.email}</Row>
+            {user?.role && <Row label="Role"><span className="capitalize">{user.role.toLowerCase()}</span></Row>}
+            {user?.id != null && (
+              <Row label="Account ID">
+                <CopyValue value={String(user.id)} />
+              </Row>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </Panel>
 
-      {/* Settings Tabs */}
-      <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3 h-auto">
-          <TabsTrigger value="profile" className="flex items-center gap-2 py-2">
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Profile</span>
-          </TabsTrigger>
-          <TabsTrigger value="account" className="flex items-center gap-2 py-2">
-            <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Account</span>
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2 py-2" disabled>
-            <Bell className="h-4 w-4" />
-            <span className="hidden sm:inline">Notifications</span>
-          </TabsTrigger>
-        </TabsList>
+        {/* useSearchParams needs a Suspense boundary */}
+        <Suspense fallback={<Panel title="GitHub"><div className="h-11 rounded-xl bg-fill animate-pulse" /></Panel>}>
+          <GitHubPanel token={token} />
+        </Suspense>
 
-        {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>
-                Update your personal information and how others see you on {PRODUCT_NAME}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="John"
-                    disabled={savingProfile}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Doe"
-                    disabled={savingProfile}
-                  />
-                </div>
-              </div>
+        <Panel title="Session" description="You’re signed in on this device.">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="inline-flex items-center gap-2 text-[15px] text-label min-w-0">
+              <span className="size-2 rounded-full bg-sys-green shrink-0" />
+              <span className="truncate">{user?.email}</span>
+            </p>
+            <button type="button" className={cn(btn.secondary, "shrink-0")} onClick={signOut} disabled={signingOut}>
+              {signingOut ? <Spinner /> : <LogOut className="size-4" aria-hidden />}
+              Sign out
+            </button>
+          </div>
+        </Panel>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={user?.email || ""}
-                  disabled
-                  className="bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Your email address is used for login and cannot be changed.
-                </p>
-              </div>
-
-              <Separator className="my-6" />
-
-              <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setFirstName(user?.firstName || "");
-                    setLastName(user?.lastName || "");
-                  }}
-                  disabled={savingProfile}
-                >
-                  Reset
-                </Button>
-                <Button onClick={handleSaveProfile} disabled={savingProfile}>
-                  {savingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Changes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Account Tab */}
-        <TabsContent value="account" className="space-y-4">
-          {/* Session Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Session Management</CardTitle>
-              <CardDescription>
-                Manage your active sessions and sign out from {PRODUCT_NAME}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 rounded-lg border bg-muted/50">
-                <div className="flex items-start justify-between gap-4 flex-col sm:flex-row">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                      <p className="font-semibold">Current Session</p>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Signed in as <span className="font-medium text-foreground">{user?.email}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      This is your active session on this device.
-                    </p>
-                  </div>
-                  <Badge variant="secondary" className="shrink-0">Active</Badge>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-semibold mb-2">Sign out</h4>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Signing out will end your current session. You&apos;ll need to sign in again to access your account.
-                  </p>
-                  <Button
-                    variant="destructive"
-                    onClick={handleLogout}
-                    disabled={loggingOut}
-                    className="w-full sm:w-auto"
-                  >
-                    {loggingOut ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing out...
-                      </>
-                    ) : (
-                      <>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign Out
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* GitHub Integration */}
-          <Card>
-            <CardHeader>
-              <CardTitle>GitHub Integration</CardTitle>
-              <CardDescription>
-                Connect your GitHub account to access private repositories and enable automatic deployments.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <GitHubConnectionCard token={token} />
-            </CardContent>
-          </Card>
-
-          {/* Danger Zone */}
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="text-destructive">Danger Zone</CardTitle>
-              <CardDescription>
-                Irreversible and destructive actions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 rounded-lg border border-destructive/20 bg-destructive/5">
-                <h4 className="font-semibold mb-2">Delete Account</h4>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Once you delete your account, there is no going back. This will permanently delete all your projects and data.
-                </p>
-                <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground" disabled>
-                  Delete Account
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  This feature is currently disabled. Contact support to delete your account.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Notifications Tab (Disabled) */}
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Configure how you receive notifications from {PRODUCT_NAME}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">This feature is coming soon.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        <Panel title={<span className="text-sys-red">Delete account</span>} description="Removes your account, projects and deployments for good.">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-[13px] text-label-2">Not available here yet. Contact support to delete your account.</p>
+            <button type="button" className={cn(btn.dangerQuiet, "shrink-0")} disabled>
+              Delete account
+            </button>
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }

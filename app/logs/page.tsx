@@ -182,7 +182,7 @@ import LogsPageClient from "./LogsPageClient";
 export const dynamic = "force-dynamic";
 export default function Page() {
   return (
-    <Suspense fallback={<div>Loading logs...</div>}>
+    <Suspense fallback={<div className="appearance-light bg-fill min-h-[calc(100svh-3rem)]" />}>
       <LogsPageClient />
     </Suspense>
   );

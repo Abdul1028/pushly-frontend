@@ -2,144 +2,195 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
+import { Check, ChevronDown, Rocket, X } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { apiFetchAuth } from "../../lib/api";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { PRODUCT_DOMAIN } from "@/lib/config";
-import { Check, X, Loader2, AlertCircle, ExternalLink, Info, Github, Rocket, ChevronDown, Settings2, KeyRound } from "lucide-react";
-import { GitHubRepoBrowser } from "@/components/github-repo-browser";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { EnvVarsEditor, EnvVar, RESERVED_ENV_KEYS } from "@/components/env-vars-editor";
+import { cn } from "@/lib/utils";
+import { RESERVED_ENV_KEYS } from "@/components/env-vars-editor";
+import { EnvRowsList, useEnvRows } from "@/components/project/env-rows";
+import { RepoPicker, type PickedRepo } from "@/components/project/repo-picker";
+import { btn, errorMessage, Panel, Segmented, Spinner, TextAreaField, TextField } from "@/components/project/ui";
 
 /* ---------------- constants ---------------- */
 
-const RESERVED_SUBDOMAINS = [
-  "www",
-  "api",
-  "admin",
-  "status",
-  "docs",
-  "developer",
-  "developers",
-  "support",
-  "auth",
-  "dashboard",
-];
+const RESERVED_SUBDOMAINS = ["www", "api", "admin", "status", "docs", "developer", "developers", "support", "auth", "dashboard"];
 
-/* ---------------- component ---------------- */
+type Source = "github" | "url";
+type Env = "STAGING" | "PRODUCTION";
+
+/* ---------------- small pieces ---------------- */
+
+// Apple-style switch
+function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200",
+        checked ? "bg-sys-green" : "bg-fill-2"
+      )}
+    >
+      <motion.span
+        className="absolute top-[2px] size-[27px] rounded-full bg-white shadow-[0_3px_8px_rgba(0,0,0,0.15),0_1px_1px_rgba(0,0,0,0.16)]"
+        animate={{ left: checked ? 22 : 2 }}
+        transition={{ type: "spring", bounce: 0.2, duration: 0.35 }}
+      />
+    </button>
+  );
+}
+
+// Section that opens and closes in place
+function Disclosure({
+  title,
+  description,
+  badge,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  description: string;
+  badge?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="rounded-2xl bg-white border border-black/[0.06] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-4 px-5 md:px-6 py-5 text-left"
+      >
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.022em] text-label">
+            {title}
+            {badge}
+          </h2>
+          <p className="mt-1 text-[13px] text-label-2">{description}</p>
+        </div>
+        <ChevronDown className={cn("size-5 text-label-3 shrink-0 transition-transform duration-300", open && "rotate-180")} aria-hidden />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+            className="overflow-hidden"
+          >
+            <div className="px-5 md:px-6 pb-6">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+/* ---------------- page ---------------- */
 
 export default function NewProjectPage() {
   const { status, token } = useAuth();
   const router = useRouter();
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [gitURL, setGitURL] = useState("");
+  const [source, setSource] = useState<Source>("github");
+  const [picked, setPicked] = useState<PickedRepo | null>(null);
+  const [manualUrl, setManualUrl] = useState("");
   const [gitBranch, setGitBranch] = useState("main");
+
+  const [name, setName] = useState("");
   const [subdomain, setSubdomain] = useState("");
-  const [selectedRepo, setSelectedRepo] = useState<string>("");
+  const [description, setDescription] = useState("");
 
-  // Build config overrides
-  const [buildConfigOpen, setBuildConfigOpen] = useState(false);
-  const [customBuildCommand, setCustomBuildCommand] = useState("");
   const [customInstallCommand, setCustomInstallCommand] = useState("");
+  const [customBuildCommand, setCustomBuildCommand] = useState("");
   const [customOutputDirectory, setCustomOutputDirectory] = useState("");
+  const env = useEnvRows();
 
-  // Environment variables
-  const [envVarsOpen, setEnvVarsOpen] = useState(false);
-  const [envVariables, setEnvVariables] = useState<EnvVar[]>([]);
-
-  // Auto-deploy options
   const [autoDeployEnabled, setAutoDeployEnabled] = useState(true);
-  const [autoDeployEnv, setAutoDeployEnv] = useState<"STAGING" | "PRODUCTION">("STAGING");
+  const [autoDeployEnv, setAutoDeployEnv] = useState<Env>("STAGING");
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // domain validation state
-  const [domainStatus, setDomainStatus] = useState<
-    "idle" | "checking" | "available" | "taken" | "invalid" | "reserved" | "short"
-  >("idle");
-
-  /* ---------------- domain validation ---------------- */
+  const [check, setCheck] = useState<{ value: string; available: boolean } | null>(null);
 
   useEffect(() => {
-    if (!subdomain) {
-      setDomainStatus("idle");
-      return;
-    }
+    if (status === "unauthenticated") router.replace("/login");
+  }, [status, router]);
 
-    if (subdomain.length < 4) {
-      setDomainStatus("short");
-      return;
-    }
+  const gitURL = source === "github" ? picked?.cloneUrl ?? "" : manualUrl;
 
-    if (!/^[a-z0-9-]+$/.test(subdomain)) {
-      setDomainStatus("invalid");
-      return;
-    }
+  // Picking a repository fills in a name and subdomain if they're still empty
+  const onPick = (repo: PickedRepo | null) => {
+    setPicked(repo);
+    if (!repo) return;
+    const repoName = repo.fullName.split("/")[1] ?? "";
+    if (!name) setName(repoName.replace(/[-_]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()));
+    if (!subdomain) setSubdomain(repoName.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+  };
 
-    if (RESERVED_SUBDOMAINS.includes(subdomain)) {
-      setDomainStatus("reserved");
-      return;
-    }
+  /* ---------------- subdomain validation ---------------- */
 
-    setDomainStatus("checking");
+  const localProblem = !subdomain
+    ? "empty"
+    : subdomain.length < 4
+      ? "short"
+      : !/^[a-z0-9-]+$/.test(subdomain)
+        ? "invalid"
+        : RESERVED_SUBDOMAINS.includes(subdomain)
+          ? "reserved"
+          : null;
 
-    const timer = setTimeout(async () => {
+  useEffect(() => {
+    if (localProblem || !token) return;
+    const value = subdomain;
+    const t = setTimeout(async () => {
       try {
-        const res = await apiFetchAuth<{
-          available: boolean;
-        }>(
-          `/api/projects/domain-available?domain=${subdomain}`,
-          token!
-        );
-
-        setDomainStatus(res.available ? "available" : "taken");
+        const res = await apiFetchAuth<{ available: boolean }>(`/api/projects/domain-available?domain=${value}`, token);
+        setCheck({ value, available: res.available });
       } catch {
-        setDomainStatus("taken");
+        setCheck({ value, available: false });
       }
     }, 500);
+    return () => clearTimeout(t);
+  }, [subdomain, localProblem, token]);
 
-    return () => clearTimeout(timer);
-  }, [subdomain, token]);
+  const domainStatus = localProblem ?? (check?.value !== subdomain ? "checking" : check.available ? "available" : "taken");
+  const domainHint: Record<string, { text: string; tone: "muted" | "ok" | "bad" | "warn" }> = {
+    empty: { text: "At least 4 characters: lowercase letters, numbers and hyphens.", tone: "muted" },
+    short: { text: "At least 4 characters.", tone: "warn" },
+    invalid: { text: "Only lowercase letters, numbers and hyphens.", tone: "bad" },
+    reserved: { text: "That name is reserved.", tone: "warn" },
+    checking: { text: "Checking availability…", tone: "muted" },
+    available: { text: "Available", tone: "ok" },
+    taken: { text: "Already taken", tone: "bad" },
+  };
 
-  /* ---------------- submit ---------------- */
+  /* ---------------- submit (same request as before) ---------------- */
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!token) return;
-
     if (domainStatus !== "available") {
-      setError("Please choose a valid and available subdomain");
+      setError("Choose an available subdomain first.");
       return;
     }
-
+    if (!gitURL) {
+      setError("Choose a repository first.");
+      return;
+    }
     setLoading(true);
     setError(null);
-
     try {
-      // Filter out blank rows and reserved keys before sending
-      const cleanEnvVars = envVariables
-        .filter(v => v.key.trim() && !RESERVED_ENV_KEYS.has(v.key.toUpperCase()));
-
+      const cleanEnvVars = env.clean.filter((v) => !RESERVED_ENV_KEYS.has(v.key.toUpperCase()));
       const body = {
         name,
         description,
@@ -153,514 +204,215 @@ export default function NewProjectPage() {
         customOutputDirectory: customOutputDirectory.trim() || null,
         envVariables: cleanEnvVars.length > 0 ? cleanEnvVars : undefined,
       };
-
-      const res = await apiFetchAuth<{
-        id: string;
-        deploymentId?: string;
-      }>("/api/projects", token, {
+      const res = await apiFetchAuth<{ id: string; deploymentId?: string }>("/api/projects", token, {
         method: "POST",
         body: JSON.stringify(body),
       });
-
-      // Redirect based on whether auto-deploy is enabled
-      if (autoDeployEnabled && res.deploymentId) {
-        // Redirect to logs page to show live build progress
-        router.replace(`/logs?projectId=${res.id}&deploymentId=${res.deploymentId}`);
-      } else {
-        router.replace(`/project/${res.id}`);
-      }
-    } catch (err: any) {
-      setError(err?.message || "Failed to create project");
-    } finally {
+      // Watch the first build, or open the new project
+      if (autoDeployEnabled && res.deploymentId) router.replace(`/logs?projectId=${res.id}&deploymentId=${res.deploymentId}`);
+      else router.replace(`/project/${res.id}`);
+    } catch (err) {
+      setError(errorMessage(err, "Couldn’t create the project."));
       setLoading(false);
     }
   }
 
-  /* ---------------- status indicator component ---------------- */
+  if (status !== "authenticated") return <div className="appearance-light bg-fill min-h-[calc(100svh-3rem)]" />;
 
-  const DomainStatusIndicator = () => {
-    if (!subdomain) return null;
-
-    const statusConfig = {
-      checking: {
-        icon: <Loader2 className="w-4 h-4 animate-spin" />,
-        text: "Checking availability...",
-        color: "text-muted-foreground",
-        bgColor: "bg-muted/50 border-muted",
-      },
-      available: {
-        icon: <Check className="w-4 h-4" />,
-        text: "Available",
-        color: "text-green-400",
-        bgColor: "bg-green-500/10 border-green-500/30",
-      },
-      taken: {
-        icon: <X className="w-4 h-4" />,
-        text: "Already taken",
-        color: "text-destructive",
-        bgColor: "bg-destructive/10 border-destructive/30",
-      },
-      reserved: {
-        icon: <AlertCircle className="w-4 h-4" />,
-        text: "Reserved keyword",
-        color: "text-amber-400",
-        bgColor: "bg-amber-500/10 border-amber-500/30",
-      },
-      short: {
-        icon: <Info className="w-4 h-4" />,
-        text: "Minimum 4 characters required",
-        color: "text-amber-400",
-        bgColor: "bg-amber-500/10 border-amber-500/30",
-      },
-      invalid: {
-        icon: <X className="w-4 h-4" />,
-        text: "Only lowercase letters, numbers, and hyphens allowed",
-        color: "text-destructive",
-        bgColor: "bg-destructive/10 border-destructive/30",
-      },
-    };
-
-    const config = statusConfig[domainStatus as keyof typeof statusConfig];
-    if (!config) return null;
-
-    return (
-      <div
-        className={`mt-2 flex items-center gap-2 px-3 py-2 rounded-md border ${config.bgColor} ${config.color} text-sm font-medium transition-all`}
-      >
-        {config.icon}
-        <span>{config.text}</span>
-      </div>
-    );
-  };
-
-  if (status !== "authenticated") return null;
-
-  /* ---------------- render ---------------- */
+  const ready = !!name.trim() && domainStatus === "available" && !!gitURL && !env.hasProblems;
+  const envName = autoDeployEnv === "PRODUCTION" ? "Production" : "Staging";
+  const hint = domainHint[domainStatus];
+  const varCount = env.clean.length;
+  const buildCount = [customInstallCommand, customBuildCommand, customOutputDirectory].filter((v) => v.trim()).length;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Card className="text-sm">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold">New Project</CardTitle>
-          <CardDescription className="text-sm">
-            Deploy your application in minutes with custom subdomain
-          </CardDescription>
-        </CardHeader>
+    <div className="appearance-light bg-fill text-label min-h-[calc(100svh-3rem)]">
+      <form onSubmit={onSubmit} className="mx-auto max-w-[760px] px-4 sm:px-6 py-8 sm:py-12 space-y-5">
+        <div className="mb-2">
+          <h1 className="text-title text-label">New project</h1>
+          <p className="mt-1.5 text-[15px] text-label-2">Import a repository and Pushly builds it, picks a URL and ships it.</p>
+        </div>
 
-        <CardContent>
-          {error && (
-            <div className="mb-6 p-4 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <span>{error}</span>
+        {/* 1. Repository */}
+        <Panel
+          title="Repository"
+          description="Where your code lives."
+          action={
+            <Segmented<Source>
+              label="Repository source"
+              value={source}
+              onChange={setSource}
+              options={[
+                { value: "github", label: "GitHub" },
+                { value: "url", label: "Git URL" },
+              ]}
+            />
+          }
+        >
+          {source === "github" ? (
+            <RepoPicker token={token} picked={picked} onPick={onPick} branch={gitBranch} onBranchChange={setGitBranch} disabled={loading} />
+          ) : (
+            <div className="grid sm:grid-cols-[minmax(0,1fr)_180px] gap-4">
+              <TextField
+                label="Repository URL"
+                mono
+                value={manualUrl}
+                onChange={(e) => setManualUrl(e.target.value)}
+                placeholder="https://github.com/you/repo.git"
+                hint="GitHub, GitLab, Bitbucket or any Git host."
+                disabled={loading}
+              />
+              <TextField label="Branch" mono value={gitBranch} onChange={(e) => setGitBranch(e.target.value)} placeholder="main" disabled={loading} />
             </div>
           )}
+        </Panel>
 
-          <form onSubmit={onSubmit} className="space-y-6">
-            {/* Project Name */}
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">
-                Project name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="My Awesome Project"
-                required
-                disabled={loading}
-                className="h-10"
-              />
-              <p className="text-xs text-muted-foreground">
-                A friendly name to identify your project
-              </p>
-            </div>
-
-            {/* Subdomain */}
-            <div className="space-y-2">
-              <Label htmlFor="subdomain" className="text-sm font-medium">
-                Subdomain <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="subdomain"
+        {/* 2. Project */}
+        <Panel title="Project" description="How it’s named and where it lives.">
+          <div className="space-y-4">
+            <TextField label="Project name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My project" required disabled={loading} />
+            <div className="space-y-1.5">
+              <TextField
+                label="Subdomain"
+                mono
                 value={subdomain}
-                onChange={(e) =>
-                  setSubdomain(
-                    e.target.value
-                      .toLowerCase()
-                      .replace(/[^a-z0-9-]/g, "")
-                  )
-                }
-                placeholder="my-awesome-project"
+                onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                placeholder="my-project"
+                aria-invalid={hint.tone === "bad"}
                 disabled={loading}
-                className="h-10"
+                trailing={
+                  domainStatus === "checking" ? (
+                    <Spinner className="text-label-3" />
+                  ) : domainStatus === "available" ? (
+                    <Check className="size-4 text-sys-green" aria-hidden />
+                  ) : hint.tone === "bad" ? (
+                    <X className="size-4 text-sys-red" aria-hidden />
+                  ) : null
+                }
               />
-
-              {subdomain && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border border-border rounded-md">
-                  <span className="text-sm font-mono">
-                    https://{subdomain}.{PRODUCT_DOMAIN}
-                  </span>
-                  <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
-                </div>
-              )}
-
-              <DomainStatusIndicator />
-
-              {!subdomain && (
-                <p className="text-xs text-muted-foreground">
-                  Choose a unique subdomain for your project (min. 4 characters)
-                </p>
-              )}
-            </div>
-
-            {/* Git Configuration with Tabs */}
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-muted-foreground">Repository Source</span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-
-              <Tabs defaultValue="github" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="github" className="flex items-center gap-2">
-                    <Github className="h-4 w-4" />
-                    <span>Import from GitHub</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="manual" className="flex items-center gap-2">
-                    <ExternalLink className="h-4 w-4" />
-                    <span>Manual Git URL</span>
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="github" className="space-y-4 mt-4">
-                  <GitHubRepoBrowser
-                    token={token}
-                    selectedRepoFullName={selectedRepo}
-                    onSelectRepo={(url, branch) => {
-                      setGitURL(url);
-                      setGitBranch(branch);
-                      const match = url.match(/github\.com[:/]([^/]+\/[^/.]+)(\.git)?/);
-                      if (match) {
-                        setSelectedRepo(match[1]);
-                      }
-                      const repoName = url.split('/').pop()?.replace('.git', '') || '';
-                      if (repoName && !name) {
-                        setName(repoName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
-                      }
-                      if (repoName && !subdomain) {
-                        setSubdomain(repoName.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                      }
-                    }}
-                    onBranchChange={(branch) => {
-                      setGitBranch(branch);
-                    }}
-                  />
-
-                  {gitURL && (
-                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-                      <p className="text-xs text-muted-foreground mb-1">Selected Repository:</p>
-                      <p className="text-sm font-mono truncate">{gitURL}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Branch: {gitBranch}</p>
-                    </div>
+              {/* Live preview of the address */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="inline-flex items-center h-7 px-2.5 rounded-full bg-fill font-mono text-[12px] text-label-2 max-w-full truncate">
+                  https://{subdomain || "your-project"}.{PRODUCT_DOMAIN}
+                </span>
+                <span
+                  className={cn(
+                    "text-[12px]",
+                    hint.tone === "ok" && "text-[#248a3d]",
+                    hint.tone === "bad" && "text-sys-red",
+                    hint.tone === "warn" && "text-[#c93400]",
+                    hint.tone === "muted" && "text-label-3"
                   )}
-                </TabsContent>
-
-                <TabsContent value="manual" className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium" htmlFor="gitURL">
-                      Repository URL
-                    </Label>
-                    <Input
-                      id="gitURL"
-                      value={gitURL}
-                      onChange={(e) => setGitURL(e.target.value)}
-                      placeholder="https://github.com/username/repo.git"
-                      disabled={loading}
-                      className="h-10 font-mono text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Enter the Git URL from GitHub, GitLab, Bitbucket, or any Git provider
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium" htmlFor="gitBranch">
-                      Branch
-                    </Label>
-                    <Input
-                      id="gitBranch"
-                      value={gitBranch}
-                      onChange={(e) => setGitBranch(e.target.value)}
-                      placeholder="main"
-                      disabled={loading}
-                      className="h-10"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Branch to deploy from (defaults to "main")
-                    </p>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium" htmlFor="description">
-                Description
-              </Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="A brief description of your project..."
-                rows={3}
-                disabled={loading}
-                className="resize-none text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                Help your team understand what this project is for
-              </p>
-            </div>
-
-            {/* ── Build Configuration (collapsible) ── */}
-            <Collapsible open={buildConfigOpen} onOpenChange={setBuildConfigOpen}>
-              <div className="space-y-4 pt-2">
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 text-sm group"
-                  >
-                    <div className="h-px flex-1 bg-border" />
-                    <span className="flex items-center gap-1.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
-                      <Settings2 className="h-3.5 w-3.5" />
-                      Build Configuration
-                      <ChevronDown
-                        className={`h-3.5 w-3.5 transition-transform duration-200 ${buildConfigOpen ? "rotate-180" : ""
-                          }`}
-                      />
-                    </span>
-                    <div className="h-px flex-1 bg-border" />
-                  </button>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent className="space-y-4">
-                  <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
-                    <p className="text-xs text-muted-foreground">
-                      Override the auto-detected build settings. Leave blank to let Pushly detect them automatically from your framework.
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="installCommand" className="text-sm font-medium">
-                          Install Command
-                        </Label>
-                        <Input
-                          id="installCommand"
-                          value={customInstallCommand}
-                          onChange={(e) => setCustomInstallCommand(e.target.value)}
-                          placeholder="npm install"
-                          disabled={loading}
-                          className="h-9 font-mono text-sm"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="buildCommand" className="text-sm font-medium">
-                          Build Command
-                        </Label>
-                        <Input
-                          id="buildCommand"
-                          value={customBuildCommand}
-                          onChange={(e) => setCustomBuildCommand(e.target.value)}
-                          placeholder="npm run build"
-                          disabled={loading}
-                          className="h-9 font-mono text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="outputDir" className="text-sm font-medium">
-                        Output Directory
-                      </Label>
-                      <Input
-                        id="outputDir"
-                        value={customOutputDirectory}
-                        onChange={(e) => setCustomOutputDirectory(e.target.value)}
-                        placeholder="dist"
-                        disabled={loading}
-                        className="h-9 font-mono text-sm"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        The folder your build outputs to (e.g. dist, out, build, public)
-                      </p>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-
-            {/* ── Environment Variables (collapsible) ── */}
-            <Collapsible open={envVarsOpen} onOpenChange={setEnvVarsOpen}>
-              <div className="space-y-4">
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 text-sm group"
-                  >
-                    <div className="h-px flex-1 bg-border" />
-                    <span className="flex items-center gap-1.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
-                      <KeyRound className="h-3.5 w-3.5" />
-                      Environment Variables
-                      {envVariables.filter(v => v.key.trim()).length > 0 && (
-                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                          {envVariables.filter(v => v.key.trim()).length}
-                        </Badge>
-                      )}
-                      <ChevronDown
-                        className={`h-3.5 w-3.5 transition-transform duration-200 ${envVarsOpen ? "rotate-180" : ""
-                          }`}
-                      />
-                    </span>
-                    <div className="h-px flex-1 bg-border" />
-                  </button>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent>
-                  <EnvVarsEditor
-                    value={envVariables}
-                    onChange={setEnvVariables}
-                    disabled={loading}
-                  />
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-
-            {/* Auto-Deploy Section */}
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-muted-foreground">Deployment Options</span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-
-              <div className="p-4 rounded-lg border bg-muted/30 space-y-4">
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    id="autoDeploy"
-                    checked={autoDeployEnabled}
-                    onChange={(e) => setAutoDeployEnabled(e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-input cursor-pointer"
-                  />
-                  <div className="flex-1">
-                    <label htmlFor="autoDeploy" className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                      <Rocket className="h-4 w-4" />
-                      Auto-deploy after project creation
-                    </label>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Automatically trigger your first deployment to see your app live immediately
-                    </p>
-                  </div>
-                </div>
-
-                {autoDeployEnabled && (
-                  <div className="pl-7 space-y-3 pt-2">
-                    <Label className="text-sm font-medium">Deploy to:</Label>
-                    <div className="space-y-2">
-                      <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                        <input
-                          type="radio"
-                          name="autoDeployEnv"
-                          value="STAGING"
-                          checked={autoDeployEnv === "STAGING"}
-                          onChange={() => setAutoDeployEnv("STAGING")}
-                          className="mt-0.5 h-4 w-4 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm">Staging</span>
-                            <Badge variant="secondary" className="text-xs">Recommended</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Test environment for previewing changes before going live
-                          </p>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                        <input
-                          type="radio"
-                          name="autoDeployEnv"
-                          value="PRODUCTION"
-                          checked={autoDeployEnv === "PRODUCTION"}
-                          onChange={() => setAutoDeployEnv("PRODUCTION")}
-                          className="mt-0.5 h-4 w-4 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm">Production</span>
-                            <Badge variant="outline" className="text-xs">Live</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Deploy directly to production (choose if you're confident)
-                          </p>
-                        </div>
-                      </label>
-                    </div>
-
-                    <div className="px-3 py-2 rounded-md bg-primary/5 border border-primary/20">
-                      <p className="text-xs text-muted-foreground">
-                        💡 <strong>Tip:</strong> We recommend deploying to Staging first to test your build before promoting to Production.
-                      </p>
-                    </div>
-                  </div>
-                )}
+                >
+                  {hint.text}
+                </span>
               </div>
             </div>
+            <TextAreaField
+              label="Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What this project is for (optional)"
+              rows={2}
+              disabled={loading}
+            />
+          </div>
+        </Panel>
 
-            {/* Submit */}
-            <div className="pt-4">
-              <Button
-                type="submit"
-                className="w-full h-10 text-sm font-semibold"
-                disabled={
-                  loading ||
-                  !name ||
-                  !subdomain ||
-                  domainStatus === "checking" ||
-                  domainStatus !== "available"
-                }
+        {/* 3. Build & output (optional) */}
+        <Disclosure
+          title="Build & output"
+          description="Optional. Pushly detects these from your framework."
+          badge={buildCount > 0 ? <span className="text-[12px] font-normal text-label-3">{buildCount} set</span> : undefined}
+        >
+          <div className="grid sm:grid-cols-2 gap-4">
+            <TextField label="Install command" mono value={customInstallCommand} onChange={(e) => setCustomInstallCommand(e.target.value)} placeholder="Auto-detected" disabled={loading} />
+            <TextField label="Build command" mono value={customBuildCommand} onChange={(e) => setCustomBuildCommand(e.target.value)} placeholder="Auto-detected" disabled={loading} />
+            <TextField
+              label="Output directory"
+              mono
+              value={customOutputDirectory}
+              onChange={(e) => setCustomOutputDirectory(e.target.value)}
+              placeholder="Auto-detected"
+              hint="For example dist, out, build or public."
+              disabled={loading}
+            />
+          </div>
+        </Disclosure>
+
+        {/* 4. Environment variables (optional) */}
+        <Disclosure
+          title="Environment variables"
+          description="Optional. Paste a .env file into a key field to add them all."
+          badge={varCount > 0 ? <span className="text-[12px] font-normal text-label-3 tabular-nums">{varCount}</span> : undefined}
+        >
+          <EnvRowsList env={env} disabled={loading} emptyText="No variables. Add one if your build needs it." />
+        </Disclosure>
+
+        {/* 5. Deploy */}
+        <Panel title="Deploy">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[15px] text-label">Deploy right away</p>
+              <p className="text-[13px] text-label-2">Start the first build as soon as the project is created.</p>
+            </div>
+            <Switch checked={autoDeployEnabled} onChange={setAutoDeployEnabled} label="Deploy right away" disabled={loading} />
+          </div>
+          <AnimatePresence initial={false}>
+            {autoDeployEnabled && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.35 }}
+                className="overflow-hidden"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {autoDeployEnabled ? `Creating & Deploying to ${autoDeployEnv === 'PRODUCTION' ? 'Production' : 'Staging'}...` : 'Creating Project...'}
-                  </>
-                ) : (
-                  <>
-                    {autoDeployEnabled ? (
-                      <>
-                        <Rocket className="w-4 h-4 mr-2" />
-                        Create & Deploy to {autoDeployEnv === 'PRODUCTION' ? 'Production' : 'Staging'}
-                      </>
-                    ) : (
-                      'Create Project'
-                    )}
-                  </>
-                )}
-              </Button>
+                <div className="pt-5 mt-5 border-t border-black/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[15px] text-label">Environment</p>
+                    <p className="text-[13px] text-label-2">
+                      {autoDeployEnv === "STAGING" ? "Recommended: check it on Staging, then promote." : "Goes straight to your live URL."}
+                    </p>
+                  </div>
+                  <Segmented<Env>
+                    label="Deploy to"
+                    value={autoDeployEnv}
+                    onChange={setAutoDeployEnv}
+                    options={[
+                      { value: "STAGING", label: "Staging" },
+                      { value: "PRODUCTION", label: "Production" },
+                    ]}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Panel>
 
-              {domainStatus !== "available" && subdomain && domainStatus !== "checking" && (
-                <p className="mt-3 text-center text-sm text-muted-foreground">
-                  Please choose an available subdomain to continue
-                </p>
-              )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+        {error && (
+          <p className="text-[14px] text-sys-red" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="pt-1">
+          <button type="submit" className={cn(btn.primary, "w-full h-12 text-[16px]")} disabled={loading || !ready}>
+            {loading ? <Spinner /> : autoDeployEnabled ? <Rocket className="size-4" aria-hidden /> : null}
+            {loading
+              ? autoDeployEnabled
+                ? `Creating and deploying to ${envName}…`
+                : "Creating project…"
+              : autoDeployEnabled
+                ? `Create and deploy to ${envName}`
+                : "Create project"}
+          </button>
+          {!ready && !loading && (
+            <p className="mt-3 text-center text-[13px] text-label-3">
+              {!gitURL ? "Choose a repository to continue." : !name.trim() ? "Give your project a name." : domainStatus !== "available" ? "Pick an available subdomain." : "Fix the highlighted variables."}
+            </p>
+          )}
+        </div>
+      </form>
     </div>
   );
 }

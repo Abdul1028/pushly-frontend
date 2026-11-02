@@ -36,6 +36,20 @@ export function formatRelative(dateString?: string | null) {
   return `${Math.floor(diff / (365 * d))}y ago`;
 }
 
+/** "owner/repo" label and a browsable https link for a project's Git URL (https or git@ form) */
+export function repoInfo(gitURL?: string | null): { label: string; href: string | null } | null {
+  if (!gitURL) return null;
+  const ssh = gitURL.match(/^git@([^:]+):(.+?)(\.git)?$/);
+  if (ssh) return { label: ssh[2], href: `https://${ssh[1]}/${ssh[2]}` };
+  try {
+    const u = new URL(gitURL);
+    const path = u.pathname.replace(/\.git$/, "").replace(/^\/|\/$/g, "");
+    return { label: path || u.host, href: `https://${u.host}/${path}` };
+  } catch {
+    return { label: gitURL, href: null };
+  }
+}
+
 export function formatDate(dateString?: string | null) {
   if (!dateString) return "";
   return new Date(dateString).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -85,11 +99,12 @@ export function StatusDot({ status, showLabel = true, className }: { status?: st
 
 export function EnvPill({ environment }: { environment?: string }) {
   const prod = environment === "PRODUCTION";
+  // Quiet label: a tint, not a solid block, so it never outweighs the status beside it
   return (
     <span
       className={cn(
-        "inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium",
-        prod ? "bg-label text-white" : "bg-fill-2 text-label-2"
+        "inline-flex items-center h-5 px-1.5 rounded-md text-[11px] leading-none",
+        prod ? "bg-apple-blue/[0.08] text-link" : "bg-black/[0.05] text-label-2"
       )}
     >
       {prod ? "Production" : environment === "STAGING" ? "Staging" : environment ?? "—"}
