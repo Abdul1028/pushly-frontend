@@ -3,120 +3,91 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import {
-  Check,
-  X,
-  Loader2,
-  AlertCircle,
-  ExternalLink,
-  Info,
-  Github,
-  Rocket,
-  ChevronDown,
-  Settings2,
-  KeyRound,
-  Link2,
-  GitBranch,
-} from "lucide-react";
+import { Check, ChevronDown, Rocket, X } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { apiFetchAuth } from "../../lib/api";
 import { PRODUCT_DOMAIN } from "@/lib/config";
-import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { PageHeader, TextField, TextAreaField, Spinner } from "@/components/project/ui";
-import { GitHubRepoBrowser } from "@/components/github-repo-browser";
-import { EnvVarsEditor, EnvVar, RESERVED_ENV_KEYS } from "@/components/env-vars-editor";
 import { cn } from "@/lib/utils";
+import { RESERVED_ENV_KEYS } from "@/components/env-vars-editor";
+import { EnvRowsList, useEnvRows } from "@/components/project/env-rows";
+import { RepoPicker, type PickedRepo } from "@/components/project/repo-picker";
+import { btn, errorMessage, Panel, Segmented, Spinner, TextAreaField, TextField } from "@/components/project/ui";
 
 /* ---------------- constants ---------------- */
 
-const RESERVED_SUBDOMAINS = [
-  "www", "api", "admin", "status", "docs", "developer",
-  "developers", "support", "auth", "dashboard",
-];
+const RESERVED_SUBDOMAINS = ["www", "api", "admin", "status", "docs", "developer", "developers", "support", "auth", "dashboard"];
 
-/* ---------------- section wrapper ---------------- */
+type Source = "github" | "url";
+type Env = "STAGING" | "PRODUCTION";
 
-function Section({
-  title,
-  description,
-  icon: Icon,
-  children,
-  className,
-}: {
-  title: string;
-  description?: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-  className?: string;
-}) {
+/* ---------------- small pieces ---------------- */
+
+// Apple-style switch
+function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
-    <section className={cn("rounded-2xl bg-white border border-black/[0.06] overflow-hidden", className)}>
-      <div className="px-5 md:px-6 pt-5 md:pt-6">
-        <div className="flex items-center gap-2.5">
-          {Icon && <Icon className="size-[18px] text-label-2" aria-hidden />}
-          <h2 className="text-[17px] font-semibold tracking-[-0.022em] text-label">{title}</h2>
-        </div>
-        {description && <p className="mt-1.5 text-[13px] text-label-2">{description}</p>}
-      </div>
-      <div className="px-5 md:px-6 py-5 md:py-6">{children}</div>
-    </section>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative inline-flex h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200",
+        checked ? "bg-sys-green" : "bg-fill-2"
+      )}
+    >
+      <motion.span
+        className="absolute top-[2px] size-[27px] rounded-full bg-white shadow-[0_3px_8px_rgba(0,0,0,0.15),0_1px_1px_rgba(0,0,0,0.16)]"
+        animate={{ left: checked ? 22 : 2 }}
+        transition={{ type: "spring", bounce: 0.2, duration: 0.35 }}
+      />
+    </button>
   );
 }
 
-/* ---------------- collapsible section ---------------- */
-
-function CollapsibleSection({
+// Section that opens and closes in place
+function Disclosure({
   title,
-  icon: Icon,
+  description,
   badge,
-  open,
-  onToggle,
+  defaultOpen = false,
   children,
 }: {
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: number;
-  open: boolean;
-  onToggle: () => void;
+  description: string;
+  badge?: React.ReactNode;
+  defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <section className="rounded-2xl bg-white border border-black/[0.06] overflow-hidden">
       <button
         type="button"
-        onClick={onToggle}
-        className="flex items-center justify-between w-full px-5 md:px-6 py-4 md:py-5 text-left group"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-4 px-5 md:px-6 py-5 text-left"
       >
-        <div className="flex items-center gap-2.5">
-          <Icon className="size-[18px] text-label-2" aria-hidden />
-          <span className="text-[17px] font-semibold tracking-[-0.022em] text-label">{title}</span>
-          {badge !== undefined && badge > 0 && (
-            <span className="inline-flex items-center h-5 px-2 rounded-md bg-fill-2 text-[11px] font-medium text-label-2 tabular-nums">
-              {badge}
-            </span>
-          )}
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.022em] text-label">
+            {title}
+            {badge}
+          </h2>
+          <p className="mt-1 text-[13px] text-label-2">{description}</p>
         </div>
-        <ChevronDown
-          className={cn(
-            "size-4 text-label-3 transition-transform duration-200",
-            open && "rotate-180"
-          )}
-          aria-hidden
-        />
+        <ChevronDown className={cn("size-5 text-label-3 shrink-0 transition-transform duration-300", open && "rotate-180")} aria-hidden />
       </button>
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
-            key="content"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ type: "spring", bounce: 0, duration: 0.4 }}
             className="overflow-hidden"
           >
-            <div className="px-5 md:px-6 pb-5 md:pb-6 border-t border-black/[0.06] pt-5">
-              {children}
-            </div>
+            <div className="px-5 md:px-6 pb-6">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -124,280 +95,102 @@ function CollapsibleSection({
   );
 }
 
-/* ---------------- domain status indicator ---------------- */
-
-function DomainStatus({ status, subdomain }: { status: string; subdomain: string }) {
-  if (!subdomain || status === "idle") return null;
-
-  const configs: Record<string, { icon: React.ReactNode; text: string; tone: string }> = {
-    checking: { icon: <Loader2 className="size-4 animate-spin" />, text: "Checking availability…", tone: "text-label-2" },
-    available: { icon: <Check className="size-4" />, text: "Available", tone: "text-sys-green" },
-    taken: { icon: <X className="size-4" />, text: "Already taken", tone: "text-sys-red" },
-    reserved: { icon: <AlertCircle className="size-4" />, text: "Reserved keyword", tone: "text-sys-orange" },
-    short: { icon: <Info className="size-4" />, text: "Minimum 4 characters required", tone: "text-sys-orange" },
-    invalid: { icon: <X className="size-4" />, text: "Only lowercase letters, numbers, and hyphens", tone: "text-sys-red" },
-  };
-
-  const config = configs[status];
-  if (!config) return null;
-
-  return (
-    <div className={cn("flex items-center gap-2 text-[13px] font-medium mt-2", config.tone)}>
-      {config.icon}
-      <span>{config.text}</span>
-    </div>
-  );
-}
-
-/* ---------------- repo source tab bar ---------------- */
-
-function TabBar({
-  value,
-  onChange,
-}: {
-  value: "github" | "manual";
-  onChange: (v: "github" | "manual") => void;
-}) {
-  return (
-    <div className="inline-flex p-0.5 rounded-full bg-fill-2">
-      <button
-        type="button"
-        onClick={() => onChange("github")}
-        className={cn(
-          "inline-flex items-center gap-2 h-9 px-4 rounded-full text-[14px] font-medium transition-all duration-150",
-          value === "github"
-            ? "bg-white text-label shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
-            : "text-label-2 hover:text-label"
-        )}
-      >
-        <Github className="size-4" aria-hidden />
-        Import from GitHub
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("manual")}
-        className={cn(
-          "inline-flex items-center gap-2 h-9 px-4 rounded-full text-[14px] font-medium transition-all duration-150",
-          value === "manual"
-            ? "bg-white text-label shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
-            : "text-label-2 hover:text-label"
-        )}
-      >
-        <Link2 className="size-4" aria-hidden />
-        Manual URL
-      </button>
-    </div>
-  );
-}
-
-/* ---------------- toggle switch ---------------- */
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-  description,
-  id,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-  description?: string;
-  id: string;
-}) {
-  return (
-    <label htmlFor={id} className="flex items-start gap-3.5 cursor-pointer group">
-      <button
-        type="button"
-        id={id}
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          "relative shrink-0 mt-0.5 w-[42px] h-[26px] rounded-full transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-apple-blue",
-          checked ? "bg-sys-green" : "bg-fill-2"
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-[3px] left-[3px] size-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform duration-200",
-            checked && "translate-x-4"
-          )}
-        />
-      </button>
-      <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-medium text-label">{label}</p>
-        {description && <p className="mt-0.5 text-[13px] text-label-2">{description}</p>}
-      </div>
-    </label>
-  );
-}
-
-/* ---------------- radio option card ---------------- */
-
-function RadioCard({
-  selected,
-  onChange,
-  label,
-  description,
-  tag,
-  name,
-  value,
-}: {
-  selected: boolean;
-  onChange: () => void;
-  label: string;
-  description: string;
-  tag?: string;
-  name: string;
-  value: string;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex items-start gap-3.5 p-4 rounded-xl border cursor-pointer transition-all duration-150",
-        selected
-          ? "border-apple-blue bg-apple-blue/[0.04] shadow-[0_0_0_1px_rgba(0,113,227,0.3)]"
-          : "border-black/[0.08] hover:border-black/[0.15] hover:bg-fill/50"
-      )}
-    >
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={selected}
-        onChange={onChange}
-        className="sr-only"
-      />
-      <div
-        className={cn(
-          "mt-0.5 size-[18px] shrink-0 rounded-full border-2 grid place-items-center transition-colors",
-          selected ? "border-apple-blue" : "border-black/20"
-        )}
-      >
-        {selected && <span className="size-2.5 rounded-full bg-apple-blue" />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-[15px] font-medium text-label">{label}</span>
-          {tag && (
-            <span
-              className={cn(
-                "inline-flex items-center h-5 px-2 rounded-md text-[11px] font-medium",
-                tag === "Recommended" ? "bg-sys-green/10 text-sys-green" : "bg-fill-2 text-label-2"
-              )}
-            >
-              {tag}
-            </span>
-          )}
-        </div>
-        <p className="mt-0.5 text-[13px] text-label-2">{description}</p>
-      </div>
-    </label>
-  );
-}
-
-/* ================================================================== */
-/*  MAIN PAGE                                                         */
-/* ================================================================== */
+/* ---------------- page ---------------- */
 
 export default function NewProjectPage() {
   const { status, token } = useAuth();
   const router = useRouter();
-  const reduce = usePrefersReducedMotion();
+
+  const [source, setSource] = useState<Source>("github");
+  const [picked, setPicked] = useState<PickedRepo | null>(null);
+  const [manualUrl, setManualUrl] = useState("");
+  const [gitBranch, setGitBranch] = useState("main");
 
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [gitURL, setGitURL] = useState("");
-  const [gitBranch, setGitBranch] = useState("main");
   const [subdomain, setSubdomain] = useState("");
-  const [selectedRepo, setSelectedRepo] = useState<string>("");
-  const [repoTab, setRepoTab] = useState<"github" | "manual">("github");
+  const [description, setDescription] = useState("");
 
-  // Build config overrides
-  const [buildConfigOpen, setBuildConfigOpen] = useState(false);
-  const [customBuildCommand, setCustomBuildCommand] = useState("");
   const [customInstallCommand, setCustomInstallCommand] = useState("");
+  const [customBuildCommand, setCustomBuildCommand] = useState("");
   const [customOutputDirectory, setCustomOutputDirectory] = useState("");
+  const env = useEnvRows();
 
-  // Environment variables
-  const [envVarsOpen, setEnvVarsOpen] = useState(false);
-  const [envVariables, setEnvVariables] = useState<EnvVar[]>([]);
-
-  // Auto-deploy options
   const [autoDeployEnabled, setAutoDeployEnabled] = useState(true);
-  const [autoDeployEnv, setAutoDeployEnv] = useState<"STAGING" | "PRODUCTION">("STAGING");
+  const [autoDeployEnv, setAutoDeployEnv] = useState<Env>("STAGING");
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // domain validation state
-  const [domainStatus, setDomainStatus] = useState<
-    "idle" | "checking" | "available" | "taken" | "invalid" | "reserved" | "short"
-  >("idle");
-
-  /* ---------------- domain validation ---------------- */
+  const [check, setCheck] = useState<{ value: string; available: boolean } | null>(null);
 
   useEffect(() => {
-    if (!subdomain) {
-      setDomainStatus("idle");
-      return;
-    }
+    if (status === "unauthenticated") router.replace("/login");
+  }, [status, router]);
 
-    if (subdomain.length < 4) {
-      setDomainStatus("short");
-      return;
-    }
+  const gitURL = source === "github" ? picked?.cloneUrl ?? "" : manualUrl;
 
-    if (!/^[a-z0-9-]+$/.test(subdomain)) {
-      setDomainStatus("invalid");
-      return;
-    }
+  // Picking a repository fills in a name and subdomain if they're still empty
+  const onPick = (repo: PickedRepo | null) => {
+    setPicked(repo);
+    if (!repo) return;
+    const repoName = repo.fullName.split("/")[1] ?? "";
+    if (!name) setName(repoName.replace(/[-_]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()));
+    if (!subdomain) setSubdomain(repoName.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+  };
 
-    if (RESERVED_SUBDOMAINS.includes(subdomain)) {
-      setDomainStatus("reserved");
-      return;
-    }
+  /* ---------------- subdomain validation ---------------- */
 
-    setDomainStatus("checking");
+  const localProblem = !subdomain
+    ? "empty"
+    : subdomain.length < 4
+      ? "short"
+      : !/^[a-z0-9-]+$/.test(subdomain)
+        ? "invalid"
+        : RESERVED_SUBDOMAINS.includes(subdomain)
+          ? "reserved"
+          : null;
 
-    const timer = setTimeout(async () => {
+  useEffect(() => {
+    if (localProblem || !token) return;
+    const value = subdomain;
+    const t = setTimeout(async () => {
       try {
-        const res = await apiFetchAuth<{
-          available: boolean;
-        }>(
-          `/api/projects/domain-available?domain=${subdomain}`,
-          token!
-        );
-
-        setDomainStatus(res.available ? "available" : "taken");
+        const res = await apiFetchAuth<{ available: boolean }>(`/api/projects/domain-available?domain=${value}`, token);
+        setCheck({ value, available: res.available });
       } catch {
-        setDomainStatus("taken");
+        setCheck({ value, available: false });
       }
     }, 500);
+    return () => clearTimeout(t);
+  }, [subdomain, localProblem, token]);
 
-    return () => clearTimeout(timer);
-  }, [subdomain, token]);
+  const domainStatus = localProblem ?? (check?.value !== subdomain ? "checking" : check.available ? "available" : "taken");
+  const domainHint: Record<string, { text: string; tone: "muted" | "ok" | "bad" | "warn" }> = {
+    empty: { text: "At least 4 characters: lowercase letters, numbers and hyphens.", tone: "muted" },
+    short: { text: "At least 4 characters.", tone: "warn" },
+    invalid: { text: "Only lowercase letters, numbers and hyphens.", tone: "bad" },
+    reserved: { text: "That name is reserved.", tone: "warn" },
+    checking: { text: "Checking availability…", tone: "muted" },
+    available: { text: "Available", tone: "ok" },
+    taken: { text: "Already taken", tone: "bad" },
+  };
 
-  /* ---------------- submit ---------------- */
+  /* ---------------- submit (same request as before) ---------------- */
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!token) return;
-
     if (domainStatus !== "available") {
-      setError("Please choose a valid and available subdomain");
+      setError("Choose an available subdomain first.");
       return;
     }
-
+    if (!gitURL) {
+      setError("Choose a repository first.");
+      return;
+    }
     setLoading(true);
     setError(null);
-
     try {
-      // Filter out blank rows and reserved keys before sending
-      const cleanEnvVars = envVariables
-        .filter(v => v.key.trim() && !RESERVED_ENV_KEYS.has(v.key.toUpperCase()));
-
+      const cleanEnvVars = env.clean.filter((v) => !RESERVED_ENV_KEYS.has(v.key.toUpperCase()));
       const body = {
         name,
         description,
@@ -411,334 +204,215 @@ export default function NewProjectPage() {
         customOutputDirectory: customOutputDirectory.trim() || null,
         envVariables: cleanEnvVars.length > 0 ? cleanEnvVars : undefined,
       };
-
-      const res = await apiFetchAuth<{
-        id: string;
-        deploymentId?: string;
-      }>("/api/projects", token, {
+      const res = await apiFetchAuth<{ id: string; deploymentId?: string }>("/api/projects", token, {
         method: "POST",
         body: JSON.stringify(body),
       });
-
-      // Redirect based on whether auto-deploy is enabled
-      if (autoDeployEnabled && res.deploymentId) {
-        // Redirect to logs page to show live build progress
-        router.replace(`/logs?projectId=${res.id}&deploymentId=${res.deploymentId}`);
-      } else {
-        router.replace(`/project/${res.id}`);
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create project");
-    } finally {
+      // Watch the first build, or open the new project
+      if (autoDeployEnabled && res.deploymentId) router.replace(`/logs?projectId=${res.id}&deploymentId=${res.deploymentId}`);
+      else router.replace(`/project/${res.id}`);
+    } catch (err) {
+      setError(errorMessage(err, "Couldn’t create the project."));
       setLoading(false);
     }
   }
 
   if (status !== "authenticated") return <div className="appearance-light bg-fill min-h-[calc(100svh-3rem)]" />;
 
-  /* ---------------- render ---------------- */
-
-  const envCount = envVariables.filter(v => v.key.trim()).length;
+  const ready = !!name.trim() && domainStatus === "available" && !!gitURL && !env.hasProblems;
+  const envName = autoDeployEnv === "PRODUCTION" ? "Production" : "Staging";
+  const hint = domainHint[domainStatus];
+  const varCount = env.clean.length;
+  const buildCount = [customInstallCommand, customBuildCommand, customOutputDirectory].filter((v) => v.trim()).length;
 
   return (
     <div className="appearance-light bg-fill text-label min-h-[calc(100svh-3rem)]">
-      <div className="mx-auto max-w-[680px] px-4 sm:px-6 py-8 lg:py-12">
-        <PageHeader
-          title="New project."
-          subtitle="Connect a repository and get a live URL in minutes."
-        />
+      <form onSubmit={onSubmit} className="mx-auto max-w-[760px] px-4 sm:px-6 py-8 sm:py-12 space-y-5">
+        <div className="mb-2">
+          <h1 className="text-title text-label">New project</h1>
+          <p className="mt-1.5 text-[15px] text-label-2">Import a repository and Pushly builds it, picks a URL and ships it.</p>
+        </div>
 
-        <form onSubmit={onSubmit} className="mt-8 space-y-5">
-          {/* ── Error banner ── */}
+        {/* 1. Repository */}
+        <Panel
+          title="Repository"
+          description="Where your code lives."
+          action={
+            <Segmented<Source>
+              label="Repository source"
+              value={source}
+              onChange={setSource}
+              options={[
+                { value: "github", label: "GitHub" },
+                { value: "url", label: "Git URL" },
+              ]}
+            />
+          }
+        >
+          {source === "github" ? (
+            <RepoPicker token={token} picked={picked} onPick={onPick} branch={gitBranch} onBranchChange={setGitBranch} disabled={loading} />
+          ) : (
+            <div className="grid sm:grid-cols-[minmax(0,1fr)_180px] gap-4">
+              <TextField
+                label="Repository URL"
+                mono
+                value={manualUrl}
+                onChange={(e) => setManualUrl(e.target.value)}
+                placeholder="https://github.com/you/repo.git"
+                hint="GitHub, GitLab, Bitbucket or any Git host."
+                disabled={loading}
+              />
+              <TextField label="Branch" mono value={gitBranch} onChange={(e) => setGitBranch(e.target.value)} placeholder="main" disabled={loading} />
+            </div>
+          )}
+        </Panel>
+
+        {/* 2. Project */}
+        <Panel title="Project" description="How it’s named and where it lives.">
+          <div className="space-y-4">
+            <TextField label="Project name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My project" required disabled={loading} />
+            <div className="space-y-1.5">
+              <TextField
+                label="Subdomain"
+                mono
+                value={subdomain}
+                onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                placeholder="my-project"
+                aria-invalid={hint.tone === "bad"}
+                disabled={loading}
+                trailing={
+                  domainStatus === "checking" ? (
+                    <Spinner className="text-label-3" />
+                  ) : domainStatus === "available" ? (
+                    <Check className="size-4 text-sys-green" aria-hidden />
+                  ) : hint.tone === "bad" ? (
+                    <X className="size-4 text-sys-red" aria-hidden />
+                  ) : null
+                }
+              />
+              {/* Live preview of the address */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="inline-flex items-center h-7 px-2.5 rounded-full bg-fill font-mono text-[12px] text-label-2 max-w-full truncate">
+                  https://{subdomain || "your-project"}.{PRODUCT_DOMAIN}
+                </span>
+                <span
+                  className={cn(
+                    "text-[12px]",
+                    hint.tone === "ok" && "text-[#248a3d]",
+                    hint.tone === "bad" && "text-sys-red",
+                    hint.tone === "warn" && "text-[#c93400]",
+                    hint.tone === "muted" && "text-label-3"
+                  )}
+                >
+                  {hint.text}
+                </span>
+              </div>
+            </div>
+            <TextAreaField
+              label="Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What this project is for (optional)"
+              rows={2}
+              disabled={loading}
+            />
+          </div>
+        </Panel>
+
+        {/* 3. Build & output (optional) */}
+        <Disclosure
+          title="Build & output"
+          description="Optional. Pushly detects these from your framework."
+          badge={buildCount > 0 ? <span className="text-[12px] font-normal text-label-3">{buildCount} set</span> : undefined}
+        >
+          <div className="grid sm:grid-cols-2 gap-4">
+            <TextField label="Install command" mono value={customInstallCommand} onChange={(e) => setCustomInstallCommand(e.target.value)} placeholder="Auto-detected" disabled={loading} />
+            <TextField label="Build command" mono value={customBuildCommand} onChange={(e) => setCustomBuildCommand(e.target.value)} placeholder="Auto-detected" disabled={loading} />
+            <TextField
+              label="Output directory"
+              mono
+              value={customOutputDirectory}
+              onChange={(e) => setCustomOutputDirectory(e.target.value)}
+              placeholder="Auto-detected"
+              hint="For example dist, out, build or public."
+              disabled={loading}
+            />
+          </div>
+        </Disclosure>
+
+        {/* 4. Environment variables (optional) */}
+        <Disclosure
+          title="Environment variables"
+          description="Optional. Paste a .env file into a key field to add them all."
+          badge={varCount > 0 ? <span className="text-[12px] font-normal text-label-3 tabular-nums">{varCount}</span> : undefined}
+        >
+          <EnvRowsList env={env} disabled={loading} emptyText="No variables. Add one if your build needs it." />
+        </Disclosure>
+
+        {/* 5. Deploy */}
+        <Panel title="Deploy">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[15px] text-label">Deploy right away</p>
+              <p className="text-[13px] text-label-2">Start the first build as soon as the project is created.</p>
+            </div>
+            <Switch checked={autoDeployEnabled} onChange={setAutoDeployEnabled} label="Deploy right away" disabled={loading} />
+          </div>
           <AnimatePresence initial={false}>
-            {error && (
+            {autoDeployEnabled && (
               <motion.div
-                key="error"
-                role="alert"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
                 transition={{ type: "spring", bounce: 0, duration: 0.35 }}
                 className="overflow-hidden"
               >
-                <div className="rounded-xl bg-white border border-sys-red/20 p-4 flex items-start gap-3">
-                  <AlertCircle className="size-4 text-sys-red shrink-0 mt-0.5" aria-hidden />
-                  <p className="text-[14px] text-label">{error}</p>
+                <div className="pt-5 mt-5 border-t border-black/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[15px] text-label">Environment</p>
+                    <p className="text-[13px] text-label-2">
+                      {autoDeployEnv === "STAGING" ? "Recommended: check it on Staging, then promote." : "Goes straight to your live URL."}
+                    </p>
+                  </div>
+                  <Segmented<Env>
+                    label="Deploy to"
+                    value={autoDeployEnv}
+                    onChange={setAutoDeployEnv}
+                    options={[
+                      { value: "STAGING", label: "Staging" },
+                      { value: "PRODUCTION", label: "Production" },
+                    ]}
+                  />
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
+        </Panel>
 
-          {/* ── Project details ── */}
-          <Section title="Project" icon={Rocket}>
-            <div className="space-y-5">
-              <TextField
-                label="Project name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="My Awesome Project"
-                required
-                disabled={loading}
-                autoFocus
-              />
+        {error && (
+          <p className="text-[14px] text-sys-red" role="alert">
+            {error}
+          </p>
+        )}
 
-              <div className="space-y-1.5">
-                <label htmlFor="subdomain" className="block text-[13px] font-medium text-label">
-                  Subdomain
-                </label>
-                <div className="flex items-stretch">
-                  <input
-                    id="subdomain"
-                    value={subdomain}
-                    onChange={(e) =>
-                      setSubdomain(
-                        e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
-                      )
-                    }
-                    placeholder="my-project"
-                    disabled={loading}
-                    className="block flex-1 h-11 rounded-l-xl border border-r-0 border-black/10 bg-white px-3.5 text-[15px] text-label placeholder:text-label-3 outline-none transition-[border-color,box-shadow] duration-150 focus:border-apple-blue focus:shadow-[0_0_0_4px_rgba(0,113,227,0.15)] focus:z-10 disabled:opacity-60"
-                  />
-                  <div className="flex items-center h-11 px-3.5 rounded-r-xl border border-black/10 bg-fill text-[14px] text-label-2 font-mono whitespace-nowrap">
-                    .{PRODUCT_DOMAIN}
-                  </div>
-                </div>
-
-                {subdomain && domainStatus === "available" && (
-                  <div className="flex items-center gap-1.5 mt-2 text-[13px] text-label-2">
-                    <ExternalLink className="size-3.5" aria-hidden />
-                    <span className="font-mono">https://{subdomain}.{PRODUCT_DOMAIN}</span>
-                  </div>
-                )}
-
-                <DomainStatus status={domainStatus} subdomain={subdomain} />
-
-                {!subdomain && (
-                  <p className="text-[12px] text-label-3">
-                    Choose a unique subdomain for your project (min. 4 characters).
-                  </p>
-                )}
-              </div>
-
-              <TextAreaField
-                label="Description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="A brief description of your project…"
-                rows={2}
-                disabled={loading}
-                hint="Optional. Helps your team understand what this project is for."
-              />
-            </div>
-          </Section>
-
-          {/* ── Repository source ── */}
-          <Section title="Repository" description="Where your code lives." icon={Github}>
-            <div className="space-y-5">
-              <TabBar value={repoTab} onChange={setRepoTab} />
-
-              {repoTab === "github" ? (
-                <div className="space-y-4">
-                  <GitHubRepoBrowser
-                    token={token}
-                    selectedRepoFullName={selectedRepo}
-                    onSelectRepo={(url, branch) => {
-                      setGitURL(url);
-                      setGitBranch(branch);
-                      const match = url.match(/github\.com[:/]([^/]+\/[^/.]+)(\.git)?/);
-                      if (match) {
-                        setSelectedRepo(match[1]);
-                      }
-                      const repoName = url.split('/').pop()?.replace('.git', '') || '';
-                      if (repoName && !name) {
-                        setName(repoName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
-                      }
-                      if (repoName && !subdomain) {
-                        setSubdomain(repoName.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                      }
-                    }}
-                    onBranchChange={(branch) => {
-                      setGitBranch(branch);
-                    }}
-                  />
-
-                  {gitURL && (
-                    <div className="flex items-center gap-3 rounded-xl bg-fill p-4">
-                      <GitBranch className="size-4 text-label-2 shrink-0" aria-hidden />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[14px] font-medium text-label truncate font-mono">{gitURL}</p>
-                        <p className="text-[12px] text-label-3 mt-0.5">Branch: {gitBranch}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <TextField
-                    label="Repository URL"
-                    value={gitURL}
-                    onChange={(e) => setGitURL(e.target.value)}
-                    placeholder="https://github.com/username/repo.git"
-                    disabled={loading}
-                    mono
-                    hint="Enter the Git URL from GitHub, GitLab, Bitbucket, or any Git provider."
-                  />
-                  <TextField
-                    label="Branch"
-                    value={gitBranch}
-                    onChange={(e) => setGitBranch(e.target.value)}
-                    placeholder="main"
-                    disabled={loading}
-                    hint='Branch to deploy from (defaults to "main").'
-                  />
-                </div>
-              )}
-            </div>
-          </Section>
-
-          {/* ── Build configuration (collapsible) ── */}
-          <CollapsibleSection
-            title="Build settings"
-            icon={Settings2}
-            open={buildConfigOpen}
-            onToggle={() => setBuildConfigOpen((v) => !v)}
-          >
-            <div className="space-y-5">
-              <p className="text-[13px] text-label-2">
-                Override auto-detected build settings. Leave blank to let Pushly detect them from your framework.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <TextField
-                  label="Install command"
-                  value={customInstallCommand}
-                  onChange={(e) => setCustomInstallCommand(e.target.value)}
-                  placeholder="npm install"
-                  disabled={loading}
-                  mono
-                />
-                <TextField
-                  label="Build command"
-                  value={customBuildCommand}
-                  onChange={(e) => setCustomBuildCommand(e.target.value)}
-                  placeholder="npm run build"
-                  disabled={loading}
-                  mono
-                />
-              </div>
-              <TextField
-                label="Output directory"
-                value={customOutputDirectory}
-                onChange={(e) => setCustomOutputDirectory(e.target.value)}
-                placeholder="dist"
-                disabled={loading}
-                mono
-                hint="The folder your build outputs to (e.g. dist, out, build, public)."
-              />
-            </div>
-          </CollapsibleSection>
-
-          {/* ── Environment variables (collapsible) ── */}
-          <CollapsibleSection
-            title="Environment variables"
-            icon={KeyRound}
-            badge={envCount}
-            open={envVarsOpen}
-            onToggle={() => setEnvVarsOpen((v) => !v)}
-          >
-            <EnvVarsEditor
-              value={envVariables}
-              onChange={setEnvVariables}
-              disabled={loading}
-            />
-          </CollapsibleSection>
-
-          {/* ── Deployment options ── */}
-          <Section title="Deployment" icon={Rocket}>
-            <div className="space-y-5">
-              <Toggle
-                id="autoDeploy"
-                checked={autoDeployEnabled}
-                onChange={setAutoDeployEnabled}
-                label="Deploy after creation"
-                description="Automatically trigger your first deployment to see your app live immediately."
-              />
-
-              {autoDeployEnabled && (
-                <motion.div
-                  initial={reduce ? false : { opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ type: "spring", bounce: 0, duration: 0.35 }}
-                  className="space-y-3 pl-[54px]"
-                >
-                  <p className="text-[13px] font-medium text-label">Deploy to</p>
-                  <div className="space-y-2.5">
-                    <RadioCard
-                      name="autoDeployEnv"
-                      value="STAGING"
-                      selected={autoDeployEnv === "STAGING"}
-                      onChange={() => setAutoDeployEnv("STAGING")}
-                      label="Staging"
-                      tag="Recommended"
-                      description="Test environment for previewing changes before going live."
-                    />
-                    <RadioCard
-                      name="autoDeployEnv"
-                      value="PRODUCTION"
-                      selected={autoDeployEnv === "PRODUCTION"}
-                      onChange={() => setAutoDeployEnv("PRODUCTION")}
-                      label="Production"
-                      tag="Live"
-                      description="Deploy directly to production — choose if you're confident."
-                    />
-                  </div>
-                  <p className="text-[12px] text-label-3">
-                    We recommend deploying to Staging first to test your build before promoting to Production.
-                  </p>
-                </motion.div>
-              )}
-            </div>
-          </Section>
-
-          {/* ── Submit ── */}
-          <div className="pt-2 pb-4">
-            <button
-              type="submit"
-              disabled={
-                loading ||
-                !name ||
-                !subdomain ||
-                domainStatus === "checking" ||
-                domainStatus !== "available"
-              }
-              className="btn-apple w-full h-[50px] text-[17px] disabled:opacity-50 disabled:pointer-events-none"
-            >
-              {loading ? (
-                <>
-                  <Spinner />
-                  {autoDeployEnabled
-                    ? `Creating & deploying to ${autoDeployEnv === "PRODUCTION" ? "Production" : "Staging"}…`
-                    : "Creating project…"
-                  }
-                </>
-              ) : autoDeployEnabled ? (
-                <>
-                  <Rocket className="size-4" aria-hidden />
-                  Create and deploy
-                </>
-              ) : (
-                "Create project"
-              )}
-            </button>
-
-            {domainStatus !== "available" && subdomain && domainStatus !== "checking" && (
-              <p className="mt-3 text-center text-[13px] text-label-2">
-                Please choose an available subdomain to continue.
-              </p>
-            )}
-          </div>
-        </form>
-      </div>
+        <div className="pt-1">
+          <button type="submit" className={cn(btn.primary, "w-full h-12 text-[16px]")} disabled={loading || !ready}>
+            {loading ? <Spinner /> : autoDeployEnabled ? <Rocket className="size-4" aria-hidden /> : null}
+            {loading
+              ? autoDeployEnabled
+                ? `Creating and deploying to ${envName}…`
+                : "Creating project…"
+              : autoDeployEnabled
+                ? `Create and deploy to ${envName}`
+                : "Create project"}
+          </button>
+          {!ready && !loading && (
+            <p className="mt-3 text-center text-[13px] text-label-3">
+              {!gitURL ? "Choose a repository to continue." : !name.trim() ? "Give your project a name." : domainStatus !== "available" ? "Pick an available subdomain." : "Fix the highlighted variables."}
+            </p>
+          )}
+        </div>
+      </form>
     </div>
   );
 }

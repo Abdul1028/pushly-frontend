@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { AnimatePresence, motion, type PanInfo } from "motion/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Moon, Sun, LayoutDashboard, Settings, PlusCircle, Menu, X } from "lucide-react"
+import { Moon, Sun, LayoutDashboard, Settings, PlusCircle, Menu, X, Layers } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -21,6 +21,7 @@ import { GrowLink } from "@/components/page-morph"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/deployments", label: "Deployments", icon: Layers },
   { href: "/new", label: "New Project", icon: PlusCircle },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
@@ -49,7 +50,8 @@ export function Nav() {
   if (status === "loading") {
     // Same bar as the resolved state so the page doesn't jump when auth settles
     const publicPage = pathname === "/" || pathname === "/login" || pathname === "/register"
-      || pathname?.startsWith("/dashboard") || pathname?.startsWith("/project") || pathname === "/new" || pathname === "/settings"
+      || pathname?.startsWith("/dashboard") || pathname?.startsWith("/project") || pathname === "/settings"
+      || pathname === "/new" || pathname === "/logs" || pathname === "/deployments"
     return (
       <nav aria-busy="true" className={cn(
         "sticky top-0 z-50 pt-[env(safe-area-inset-top)]",
@@ -224,7 +226,8 @@ export function Nav() {
   }
 
   // Redesigned app pages (pushly-ui light appearance) get the light bar; the rest keep the old one for now
-  const appLight = pathname?.startsWith("/dashboard") || pathname?.startsWith("/project") || pathname === "/new" || pathname === "/settings"
+  const appLight = pathname?.startsWith("/dashboard") || pathname?.startsWith("/project") || pathname === "/settings"
+      || pathname === "/new" || pathname === "/logs" || pathname === "/deployments"
   if (appLight) {
     return (
       <nav className="material-light border-b border-black/10 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
@@ -246,7 +249,7 @@ export function Nav() {
                     isActive ? "bg-black/[0.06] text-label font-medium" : "text-label-2 hover:text-label"
                   )}
                 >
-                  {item.label === "Dashboard" ? "Projects" : item.label}
+                  {item.label === "Dashboard" ? "Projects" : item.label === "New Project" ? "New project" : item.label}
                 </Link>
               )
             })}

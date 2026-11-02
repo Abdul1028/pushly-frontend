@@ -223,7 +223,8 @@ function SettingsForm({ project }: { project: Project }) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-            className="fixed z-40 bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[560px]"
+            // On phones/tablets it sits above the floating project menu pill
+            className="fixed z-40 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[560px]"
           >
             <div className="material-light flex items-center justify-between gap-3 rounded-2xl border border-black/10 pl-5 pr-2 py-2 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.3)]">
               <p className="text-[14px] text-label">You have unsaved changes.</p>
