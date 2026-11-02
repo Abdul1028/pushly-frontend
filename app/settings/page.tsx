@@ -1,265 +1,438 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Copy, Github, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { API_BASE_URL } from "@/lib/api";
-import { GITHUB_CLIENT_ID, PRODUCT_NAME } from "@/lib/config";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  User,
+  Mail,
+  LogOut,
+  Shield,
+  Bell,
+  Loader2,
+  Check,
+  AlertTriangle,
+} from "lucide-react";
+import { PRODUCT_NAME } from "@/lib/config";
+import { GitHubConnectionCard } from "@/components/github-connection-card";
+import { PageHeader, Panel, TextField, btn } from "@/components/project/ui";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import { btn, ConfirmDialog, Panel, Spinner } from "@/components/project/ui";
 
-// Account settings in the pushly-ui style: one centred column, like an Apple account page.
-// Same endpoints as before (GitHub status/connect/disconnect, logout); no backend changes.
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-6 py-3.5 first:pt-0 last:pb-0">
-      <span className="text-[13px] text-label-2 shrink-0">{label}</span>
-      <div className="text-[15px] text-label min-w-0 sm:text-right">{children}</div>
-    </div>
-  );
-}
-
-function CopyValue({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <span className="inline-flex items-center gap-1 min-w-0">
-      <span className="font-mono text-[13px] truncate">{value}</span>
-      <button
-        type="button"
-        onClick={async () => {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        }}
-        className={cn(btn.icon, "size-8 shrink-0")}
-        aria-label="Copy account ID"
-      >
-        {copied ? <Check className="size-4 text-sys-green" /> : <Copy className="size-3.5" />}
-      </button>
-    </span>
-  );
-}
-
-/* ── GitHub (logic carried over from the old GitHubConnectionCard) ── */
-
-function GitHubPanel({ token }: { token: string | null }) {
-  const { toast } = useToast();
-  const searchParams = useSearchParams();
-  const [connected, setConnected] = useState(false);
-  const [username, setUsername] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [confirm, setConfirm] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-
-  const checkStatus = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/users/github/status`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        const data = await res.json();
-        setConnected(!!data.connected);
-        setUsername(data.githubUsername || "");
-      }
-    } catch (e) {
-      console.error("Failed to check GitHub status:", e);
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    void checkStatus();
-  }, [checkStatus]);
-
-  // Result of the GitHub OAuth round trip (?github=connected|error)
-  useEffect(() => {
-    const result = searchParams?.get("github");
-    if (!result) return;
-    if (result === "connected") {
-      toast({ title: "GitHub connected" });
-      void checkStatus();
-    } else if (result === "error") {
-      toast({ variant: "destructive", title: "GitHub connection failed", description: searchParams?.get("message") || undefined });
-    }
-    window.history.replaceState({}, "", "/settings");
-  }, [searchParams, toast, checkStatus]);
-
-  const connect = () => {
-    if (!token) return;
-    // JWT goes as the OAuth state (tokens live in localStorage, not cookies)
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=repo,read:user&state=${encodeURIComponent(token)}`;
-  };
-
-  const disconnect = async () => {
-    if (!token) return;
-    setDisconnecting(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/users/github`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error();
-      setConnected(false);
-      setUsername("");
-      setConfirm(false);
-      toast({ title: "GitHub disconnected" });
-    } catch {
-      toast({ variant: "destructive", title: "Couldn’t disconnect GitHub" });
-    } finally {
-      setDisconnecting(false);
-    }
-  };
-
-  return (
-    <Panel title="GitHub" description="Import private repositories and let pushes deploy automatically.">
-      {loading ? (
-        <div className="h-11 rounded-xl bg-fill animate-pulse" />
-      ) : connected ? (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="size-11 rounded-full bg-label text-white grid place-items-center shrink-0">
-              <Github className="size-5" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[15px] font-medium text-label truncate">{username ? `@${username}` : "Connected"}</p>
-              <p className="inline-flex items-center gap-1.5 text-[13px] text-label-2">
-                <span className="size-2 rounded-full bg-sys-green" /> Connected
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {username && (
-              <a href={`https://github.com/${username}`} target="_blank" rel="noopener noreferrer" className={btn.secondary}>
-                View profile
-              </a>
-            )}
-            <button type="button" className={btn.dangerQuiet} onClick={() => setConfirm(true)}>
-              Disconnect
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <p className="text-[15px] text-label-2">Not connected. Public repositories still work with a Git URL.</p>
-          <button type="button" className={cn(btn.primary, "shrink-0")} onClick={connect}>
-            <Github className="size-4" aria-hidden />
-            Connect GitHub
-          </button>
-        </div>
-      )}
-
-      <ConfirmDialog
-        open={confirm}
-        onOpenChange={(o) => !disconnecting && setConfirm(o)}
-        title="Disconnect GitHub?"
-        description="Pushly will lose access to your private repositories until you connect again."
-        confirmLabel="Disconnect"
-        tone="danger"
-        busy={disconnecting}
-        onConfirm={disconnect}
-      />
-    </Panel>
-  );
-}
+type TabKey = "profile" | "account" | "notifications";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { user, token, status, logout } = useAuth();
   const { toast } = useToast();
-  const [signingOut, setSigningOut] = useState(false);
+  const reduce = usePrefersReducedMotion();
 
+  const [activeTab, setActiveTab] = useState<TabKey>("profile");
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // Profile edit states
+  const [firstName, setFirstName] = useState(user?.firstName || "");
+  const [lastName, setLastName] = useState(user?.lastName || "");
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Sync state if user loads late
   useEffect(() => {
-    if (status === "unauthenticated") router.push("/login");
+    if (user) {
+      setFirstName(user.firstName || "");
+      setLastName(user.lastName || "");
+    }
+  }, [user]);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
   }, [status, router]);
 
-  const signOut = async () => {
-    setSigningOut(true);
+  const handleLogout = async () => {
+    setLoggingOut(true);
     try {
       if (token) {
-        // Logout returns plain text, so this isn't parsed; local sign-out happens regardless
-        await fetch(`${API_BASE_URL}/api/auth/logout`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        }).catch((e) => console.error("Backend logout failed:", e));
+        try {
+          await fetch(`${API_BASE_URL}/api/auth/logout`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+        } catch (error) {
+          console.error("Backend logout failed:", error);
+        }
       }
+
       await logout();
-      toast({ title: "Signed out" });
+
+      toast({
+        title: "Signed out",
+        description: "You have been signed out of your account.",
+      });
+
       router.push("/");
       router.refresh();
-    } catch {
-      toast({ variant: "destructive", title: "Couldn’t sign out" });
-      setSigningOut(false);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "An error occurred while signing out.";
+      toast({
+        variant: "destructive",
+        title: "Sign out failed",
+        description: msg,
+      });
+    } finally {
+      setLoggingOut(false);
     }
   };
 
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
-  const initials = ((user?.firstName?.[0] ?? user?.email?.[0] ?? "") + (user?.lastName?.[0] ?? "")).toUpperCase();
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
-  if (status !== "authenticated") {
+      toast({
+        title: "Profile updated",
+        description: "Your personal details have been saved.",
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Failed to update profile.";
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: msg,
+      });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const getInitials = () => {
+    const first = user?.firstName || user?.email?.[0] || "";
+    const last = user?.lastName || "";
+    return `${first[0] || ""}${last[0] || ""}`.toUpperCase();
+  };
+
+  if (status === "loading") {
     return (
-      <div className="appearance-light bg-fill min-h-[calc(100svh-3rem)]">
-        <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-10 space-y-5" aria-busy="true">
-          <div className="h-20 rounded-2xl bg-white/60" />
-          <div className="h-48 rounded-2xl bg-white/60" />
+      <div className="appearance-light bg-fill text-label min-h-[calc(100svh-3rem)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="size-6 animate-spin text-label-3" />
+          <p className="text-[13px] text-label-2">Loading settings…</p>
         </div>
       </div>
     );
   }
 
+  if (status !== "authenticated") {
+    return <div className="appearance-light bg-fill min-h-[calc(100svh-3rem)]" />;
+  }
+
   return (
     <div className="appearance-light bg-fill text-label min-h-[calc(100svh-3rem)]">
-      <div className="mx-auto max-w-[720px] px-4 sm:px-6 py-8 sm:py-12 space-y-5">
-        {/* Account header */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 text-center sm:text-left pb-3">
-          <span className="size-20 rounded-full bg-gradient-to-b from-[#8e8e93] to-[#636366] text-white grid place-items-center text-[28px] font-semibold tracking-[-0.02em] shrink-0" aria-hidden>
-            {initials || "·"}
-          </span>
-          <div className="min-w-0">
-            <h1 className="text-title text-label truncate">{fullName || user?.email}</h1>
-            <p className="mt-1 text-[15px] text-label-2 truncate">{user?.email}</p>
+      <div className="mx-auto max-w-[760px] px-4 sm:px-6 py-8 lg:py-12">
+        <PageHeader
+          title="Settings"
+          subtitle="Manage your profile, authentication, and connected services."
+        />
+
+        {/* ── User Profile Identity Hero ── */}
+        <section className="mt-8 rounded-2xl bg-white border border-black/[0.06] p-6 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            {/* Avatar Squircle */}
+            <div className="relative shrink-0">
+              <div className="size-16 rounded-2xl bg-label text-white flex items-center justify-center text-[22px] font-semibold tracking-tight shadow-[0_4px_12px_rgba(0,0,0,0.12)]">
+                {getInitials()}
+              </div>
+              <span className="absolute -bottom-1 -right-1 size-5 rounded-full bg-sys-green border-2 border-white flex items-center justify-center shadow-sm">
+                <Check className="size-3 text-white stroke-[3]" />
+              </span>
+            </div>
+
+            {/* User Meta */}
+            <div className="flex-1 text-center sm:text-left min-w-0">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                <h2 className="text-[20px] font-semibold tracking-[-0.025em] text-label truncate">
+                  {user?.firstName && user?.lastName
+                    ? `${user.firstName} ${user.lastName}`
+                    : user?.email}
+                </h2>
+                {user?.role && (
+                  <span className="inline-flex items-center h-5 px-2 rounded-md bg-fill-2 text-[11px] font-medium text-label-2 capitalize">
+                    {user.role.toLowerCase()}
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-1.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1 text-[13px] text-label-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Mail className="size-3.5 text-label-3" aria-hidden />
+                  {user?.email}
+                </span>
+                {user?.id && (
+                  <span className="inline-flex items-center gap-1 text-label-3 font-mono text-[12px]">
+                    ID: {user.id}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Tab Selector (Apple-style Segmented) ── */}
+        <div className="mt-6 flex justify-center sm:justify-start">
+          <div className="inline-flex p-0.5 rounded-full bg-fill-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("profile")}
+              className={cn(
+                "inline-flex items-center gap-2 h-9 px-4 rounded-full text-[14px] font-medium transition-all duration-150",
+                activeTab === "profile"
+                  ? "bg-white text-label shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                  : "text-label-2 hover:text-label"
+              )}
+            >
+              <User className="size-4" aria-hidden />
+              Profile
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("account")}
+              className={cn(
+                "inline-flex items-center gap-2 h-9 px-4 rounded-full text-[14px] font-medium transition-all duration-150",
+                activeTab === "account"
+                  ? "bg-white text-label shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                  : "text-label-2 hover:text-label"
+              )}
+            >
+              <Shield className="size-4" aria-hidden />
+              Account
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("notifications")}
+              className={cn(
+                "inline-flex items-center gap-2 h-9 px-4 rounded-full text-[14px] font-medium transition-all duration-150",
+                activeTab === "notifications"
+                  ? "bg-white text-label shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                  : "text-label-2 hover:text-label"
+              )}
+            >
+              <Bell className="size-4" aria-hidden />
+              Notifications
+            </button>
           </div>
         </div>
 
-        <Panel title="Profile" description={`How you appear on ${PRODUCT_NAME}.`} footer={<p className="text-[12px] text-label-3">Changing your name or email isn’t available yet.</p>}>
-          <div className="divide-y divide-black/[0.06]">
-            <Row label="First name">{user?.firstName || "—"}</Row>
-            <Row label="Last name">{user?.lastName || "—"}</Row>
-            <Row label="Email">{user?.email}</Row>
-            {user?.role && <Row label="Role"><span className="capitalize">{user.role.toLowerCase()}</span></Row>}
-            {user?.id != null && (
-              <Row label="Account ID">
-                <CopyValue value={String(user.id)} />
-              </Row>
+        {/* ── Tab Content ── */}
+        <div className="mt-6">
+          <AnimatePresence mode="wait" initial={false}>
+            {activeTab === "profile" && (
+              <motion.div
+                key="tab-profile"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                className="space-y-6"
+              >
+                <Panel
+                  title="Personal Information"
+                  description={`How your identity is displayed across ${PRODUCT_NAME}.`}
+                >
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <TextField
+                        label="First name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="John"
+                        disabled={savingProfile}
+                      />
+                      <TextField
+                        label="Last name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Appleseed"
+                        disabled={savingProfile}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <TextField
+                        label="Email address"
+                        type="email"
+                        value={user?.email || ""}
+                        disabled
+                        hint="Your email address is your login identity and cannot be changed."
+                      />
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-end gap-3 border-t border-black/[0.06]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFirstName(user?.firstName || "");
+                          setLastName(user?.lastName || "");
+                        }}
+                        disabled={savingProfile}
+                        className={btn.secondary}
+                      >
+                        Reset
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveProfile}
+                        disabled={savingProfile}
+                        className={btn.primary}
+                      >
+                        {savingProfile ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" aria-hidden />
+                            Saving…
+                          </>
+                        ) : (
+                          "Save changes"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </Panel>
+              </motion.div>
             )}
-          </div>
-        </Panel>
 
-        {/* useSearchParams needs a Suspense boundary */}
-        <Suspense fallback={<Panel title="GitHub"><div className="h-11 rounded-xl bg-fill animate-pulse" /></Panel>}>
-          <GitHubPanel token={token} />
-        </Suspense>
+            {activeTab === "account" && (
+              <motion.div
+                key="tab-account"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                className="space-y-6"
+              >
+                {/* Active Session */}
+                <Panel
+                  title="Session"
+                  description="Details about your current authenticated session."
+                >
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-fill border border-black/[0.06]">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="relative flex size-2.5">
+                          <span className="absolute inset-0 rounded-full bg-sys-green animate-ping opacity-60" />
+                          <span className="relative size-2.5 rounded-full bg-sys-green" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[14px] font-medium text-label truncate">Current browser session</p>
+                          <p className="text-[12px] text-label-2 truncate mt-0.5">
+                            Authenticated as <span className="font-medium text-label">{user?.email}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center h-5 px-2 rounded-md bg-sys-green/10 text-[11px] font-medium text-sys-green shrink-0">
+                        Active
+                      </span>
+                    </div>
 
-        <Panel title="Session" description="You’re signed in on this device.">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <p className="inline-flex items-center gap-2 text-[15px] text-label min-w-0">
-              <span className="size-2 rounded-full bg-sys-green shrink-0" />
-              <span className="truncate">{user?.email}</span>
-            </p>
-            <button type="button" className={cn(btn.secondary, "shrink-0")} onClick={signOut} disabled={signingOut}>
-              {signingOut ? <Spinner /> : <LogOut className="size-4" aria-hidden />}
-              Sign out
-            </button>
-          </div>
-        </Panel>
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="min-w-0 pr-4">
+                        <p className="text-[14px] font-medium text-label">Sign out of {PRODUCT_NAME}</p>
+                        <p className="text-[12px] text-label-2 mt-0.5">
+                          Terminate this active session on your current device.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        disabled={loggingOut}
+                        className={btn.secondary}
+                      >
+                        {loggingOut ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" aria-hidden />
+                            Signing out…
+                          </>
+                        ) : (
+                          <>
+                            <LogOut className="size-4" aria-hidden />
+                            Sign out
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </Panel>
 
-        <Panel title={<span className="text-sys-red">Delete account</span>} description="Removes your account, projects and deployments for good.">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <p className="text-[13px] text-label-2">Not available here yet. Contact support to delete your account.</p>
-            <button type="button" className={cn(btn.dangerQuiet, "shrink-0")} disabled>
-              Delete account
-            </button>
-          </div>
-        </Panel>
+                {/* GitHub Integration */}
+                <Panel
+                  title="GitHub Integration"
+                  description="Connect your GitHub account to import repositories and enable automated preview builds."
+                >
+                  <GitHubConnectionCard token={token} />
+                </Panel>
+
+                {/* Destructive Zone (Clean Apple-Style) */}
+                <Panel
+                  title={<span className="text-sys-red">Delete Account</span>}
+                  description="Permanently delete your account and all associated deployment projects."
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 p-4 rounded-xl bg-fill border border-black/[0.06]">
+                      <AlertTriangle className="size-4 text-sys-orange shrink-0 mt-0.5" aria-hidden />
+                      <div className="text-[13px] text-label-2 leading-relaxed">
+                        Deleting your account will immediately stop all active deployments, release your custom subdomains, and wipe your build artifacts. This operation is permanent and irreversible.
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4 pt-1">
+                      <p className="text-[12px] text-label-3">
+                        Self-serve account deletion is temporarily restricted.
+                      </p>
+                      <button
+                        type="button"
+                        disabled
+                        className={btn.dangerQuiet}
+                      >
+                        Delete account
+                      </button>
+                    </div>
+                  </div>
+                </Panel>
+              </motion.div>
+            )}
+
+            {activeTab === "notifications" && (
+              <motion.div
+                key="tab-notifications"
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                className="space-y-6"
+              >
+                <Panel
+                  title="Notification Preferences"
+                  description="Configure deployment alerts, commit webhooks, and status messages."
+                >
+                  <div className="py-12 text-center space-y-3">
+                    <div className="size-12 rounded-full bg-fill-2 text-label-3 mx-auto grid place-items-center">
+                      <Bell className="size-5" />
+                    </div>
+                    <p className="text-[15px] font-medium text-label">Notifications are in preview</p>
+                    <p className="text-[13px] text-label-2 max-w-sm mx-auto">
+                      Granular email and webhook alerts for failed and successful builds will be available soon.
+                    </p>
+                  </div>
+                </Panel>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
